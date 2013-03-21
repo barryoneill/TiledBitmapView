@@ -1,7 +1,9 @@
 package net.nologin.meep.tbv.demo;
 
 import android.graphics.Bitmap;
+import android.util.Log;
 import net.nologin.meep.tbv.Tile;
+import net.nologin.meep.tbv.Utils;
 
 
 public class SimpleTile extends Tile {

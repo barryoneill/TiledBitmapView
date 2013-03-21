@@ -249,6 +249,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     }
 
 
+
     public void doDraw(Canvas canvas) {
 
         super.onDraw(canvas);
@@ -287,20 +288,12 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                             canvas.drawRect(t.getRect(x, y), paint_gridLine);
                         }
 
-                    } else {
-
-//                        if(displayDebug){
-//                            canvas.drawRect(t.getRect(x,y), paint_gridLine);
-//
-//                            String fmt1 = "Tile(%d,%d)";
-//                            String msg1 = String.format(fmt1, t.xId, t.yId);
-//                            canvas.drawText(msg1, x + (size/2), y + (size/2), paint_msgText);
-//                        }
-
+                    }
+                    else {
+                        // TODO: could allow provider to give us a 'no data' placeholder tile
                     }
 
                     if (displayDebug) {
-
 
                         canvas.drawRect(t.getRect(x, y), paint_gridLine);
 

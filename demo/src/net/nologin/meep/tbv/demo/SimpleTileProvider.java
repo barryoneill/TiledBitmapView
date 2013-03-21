@@ -17,7 +17,7 @@ public class SimpleTileProvider implements TileProvider {
     private static final String DEBUG_SUMMARY_FMT = "STProv[cache=%d,queue=%d]";
 
     // keep a cache of tiles we've already seen or are currently in the process of rendering
-    private final Map<String,SimpleTile> tileCache;
+     private final Map<String,SimpleTile> tileCache;
 
     private final Map<String,Bitmap> resCache;
 
@@ -33,7 +33,7 @@ public class SimpleTileProvider implements TileProvider {
         tileCache = new ConcurrentHashMap<String,SimpleTile>();
         renderQueue = Collections.synchronizedList(new LinkedList<SimpleTile>());
 
-        resCache = new HashMap<String,Bitmap>();
+        resCache = new HashMap<String, Bitmap>();
 
         tileTextPaint = new Paint();
         tileTextPaint.setColor(Color.BLUE);
@@ -103,7 +103,6 @@ public class SimpleTileProvider implements TileProvider {
         //Canvas c = new Canvas(bmp);
         //c.drawText(t.xId+","+t.yId, 30, 80, tileTextPaint);
 
-
         t.setBmpData(bmp);
 
         // put it in the cache for the UI thread to find via getTile()
@@ -134,8 +133,8 @@ public class SimpleTileProvider implements TileProvider {
             // wipe the render queue
             renderQueue.clear();
 
-            for(int x = newRange.left; x <= newRange.right; x++) {
-                for(int y = newRange.top; y <= newRange.bottom; y++) {
+            for(int y = newRange.top; y <= newRange.bottom; y++) {
+                for(int x = newRange.left; x <= newRange.right; x++) {
 
                     SimpleTile t = (SimpleTile)getTile(x, y);
                     if(t == null || t.getBmpData() == null){
@@ -151,7 +150,9 @@ public class SimpleTileProvider implements TileProvider {
 
     @Override
     public void notifyZoomFactorChangeTEMP(float newZoom) {
-        // nop
+
+        // TODO:
+
     }
 
     @Override
