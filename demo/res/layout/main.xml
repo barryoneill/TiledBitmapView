@@ -5,7 +5,29 @@
               android:layout_height="fill_parent"
         >
 
+    <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center">
+
+        <ToggleButton
+                android:id="@+id/btn_debug_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textOn="Debug On"
+                android:textOff="Debug Off"/>
+
+        <Button
+                android:id="@+id/btn_backToOrigin"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Back To Origin"/>
+
+    </LinearLayout>
+
     <net.nologin.meep.tbv.demo.SimpleTileView
+            android:id="@+id/simpleTileView"
             android:layout_width="fill_parent"
             android:layout_height="fill_parent">
 

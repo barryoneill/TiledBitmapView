@@ -2,11 +2,9 @@ package net.nologin.meep.tbv.demo;
 
 import android.content.Context;
 import android.graphics.*;
-import android.util.Log;
 import net.nologin.meep.tbv.Tile;
 import net.nologin.meep.tbv.TileProvider;
 import net.nologin.meep.tbv.TileRange;
-import net.nologin.meep.tbv.Utils;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,7 +83,6 @@ public class SimpleTileProvider implements TileProvider {
         int col = (t.xId % 5 + 5) % 5 + 1;
         int row = (t.yId % 5 + 5) % 5 + 1;
         String resName = "sr" + row + "c" + col;
-        Log.d(Utils.LOG_TAG, "Looking for " + resName);
 
         Bitmap bmp = resCache.get(resName);
 
@@ -111,9 +108,13 @@ public class SimpleTileProvider implements TileProvider {
 
     }
 
-    @Override
-    public TileRange getTileIndexBounds() {
-        return new TileRange(Integer.MIN_VALUE,0,Integer.MAX_VALUE,Integer.MAX_VALUE);
+//    @Override
+//    public TileRange getTileIndexBounds() {
+//        return new TileRange(Integer.MIN_VALUE,Integer.MIN_VALUE,Integer.MAX_VALUE,Integer.MAX_VALUE);
+//    }
+
+    public boolean scrollPastBoundaries(){
+        return false;
     }
 
     @Override

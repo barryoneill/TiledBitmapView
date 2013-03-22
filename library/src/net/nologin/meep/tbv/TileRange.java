@@ -46,7 +46,7 @@ import java.lang.Math;import java.lang.String;public class TileRange {
     }
 
     public String toString(){
-        return String.format("TileRange[%d,%d,%d,%d,n=%d]", left, top, right, bottom, numTiles());
+        return String.format("TR[x=%d to %d,y=%d to %d,n=%d]", left, right, top, bottom, numTiles());
     }
 
 }
