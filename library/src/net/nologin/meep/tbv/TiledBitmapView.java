@@ -2,10 +2,9 @@ package net.nologin.meep.tbv;
 
 import android.content.Context;
 import android.graphics.*;
-import android.os.Bundle;
-import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Pair;
 import android.view.*;
 
 import java.util.ArrayList;
@@ -24,7 +23,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     TileGenerationThread tgThread;
 
-    ScreenState state;
+    ViewState state;
 
     TileProvider tileProvider;
 
@@ -37,7 +36,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         SurfaceHolder holder = getHolder();
         holder.addCallback(this);
 
-        state = new ScreenState();
+        state = new ViewState();
         tgThread = new TileGenerationThread(holder, this);
 
         // background paint
@@ -125,14 +124,10 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
 
-        state.width = width;
-        state.height = height;
+        state.screenWidth = width;
+        state.screenHeight = height;
 
-        int tileSize = tileProvider.getTileWidthPixels();
-
-        // use int division to floor, then add 1 to cover both any deficit from rounding, + scrolling
-        state.numVisibleTiles_w = (state.width / tileSize)+1;
-        state.numVisibleTiles_h = (state.height / tileSize)+1;
+        state.tileWidth = tileProvider.getTileWidthPixels();
 
         jumpToOriginTile();
     }
@@ -143,12 +138,17 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             return;
         }
 
-        // todo: copy this into state?
-        int tileSize = tileProvider.getTileWidthPixels();
+        /* Imagine the (0,0) tile placed on the y axis, half on each side.  Our x-scroll offset is what's left over
+         * when we fill up the remainder of the left area, until there's no room left in the view for more full tiles.
+         */
+        int halfScreen = (state.screenWidth + state.tileWidth) / 2;
+        state.scrollOffsetX = halfScreen % state.tileWidth;
+
 
         // in the case of an odd number of horizontal tiles, we need an offset to move the origin to the middle
-        state.canvasOffsetX = state.numVisibleTiles_w % 2 != 0 ? -tileSize / 2 : 0;
-        state.canvasOffsetY = 0;
+        //state.scrollOffsetX = fitCompletelyOnScreen % 2 == state. ? -tileSize / 2 : 0;
+        //Toast.makeText(this.getContext(),"WOAH it's " + state.screenWidth + "/256=" + (state.screenWidth/state.tileWidth) % 2, Toast.LENGTH_SHORT).show();
+        state.scrollOffsetY = 0;
 
         handleOffsetChange();
 
@@ -157,29 +157,54 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     private void handleOffsetChange() {
 
-        //Log.w(Utils.LOG_TAG, "--------------------- offset change -----------------------------");
+        Pair<Integer,Integer> hInfo = calculate1DTileRange(state.scrollOffsetX, state.screenWidth, state.tileWidth);
+        Pair<Integer,Integer> vInfo = calculate1DTileRange(state.scrollOffsetY, state.screenHeight, state.tileWidth);
 
-        /* get the id of the leftmost tile which puts half the tiles on the left of the y-axis
-         * Integer division rounding will put the larger half (in the case of odd) on the right */
-        int leftTileID = -(state.numVisibleTiles_w - (state.numVisibleTiles_w / 2));
-
-        // decrease the left tile id for the number of tiles that fit in the x-offset (int division)
-        leftTileID -= state.canvasOffsetX / tileProvider.getTileWidthPixels();
-
-
-        int topTileId = -state.canvasOffsetY / tileProvider.getTileWidthPixels();
-
-
-        state.visibleTileIdRange = new TileRange(leftTileID, topTileId, leftTileID + state.numVisibleTiles_w, topTileId + state.numVisibleTiles_h);
+        state.visibleTileIdRange = new TileRange(hInfo.first, vInfo.first, hInfo.second, vInfo.second);
 
         tileProvider.notifyTileIDRangeChange(state.visibleTileIdRange);
 
     }
 
+    String lastMsg1 = "";
+
+    private Pair<Integer,Integer> calculate1DTileRange(int offset, int availableLength, int tileWidth){
+
+        int numTiles = availableLength / tileWidth; // int division floors
+
+        int startTileId = (-numTiles/2) - (offset / tileWidth);
+
+        int remainingOffset = offset % tileWidth;
+
+        String offsetApplied = "";
+        if(remainingOffset!=0){
+            // we have blank space either side, add another tile and apply appropriate offset to startId
+            numTiles++;
+            // positive offset means one tile before, a negative one means after (handled by increase in numtiles)
+            if(remainingOffset > 0){
+                startTileId--;
+            }
+
+        }
+
+        String msg = String.format("numTiles=%d, startTileId=%d, (offapp=%s)", numTiles, startTileId, offsetApplied);
+        if(!msg.equals(lastMsg1)){
+            Log.e(Utils.LOG_TAG,String.format("MOVE - offset=%d, numTiles=%d, startTileId=%d, offapp=%s, remainingOffset=%d", offset, numTiles,startTileId,offsetApplied, remainingOffset));
+            lastMsg1 = msg;
+        }
+
+
+
+        return new Pair<Integer, Integer>(startTileId,startTileId+numTiles-1);
+
+    }
+
+
+
 
     private class MissingTile extends Tile {
         public MissingTile(int x, int y) {
-            super(x,y,tileProvider.getTileWidthPixels());
+            super(x,y,state.tileWidth);
         }
         public Bitmap getBmpData() {return null;}
     }
@@ -263,6 +288,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     }
 
 
+    int i =0;
 
     public void doDraw(Canvas canvas) {
 
@@ -270,27 +296,38 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         canvas.save();
 
-        // the offsets may change during doDraw; Use a copy, otherwise there'll be flickering/tearing of tiles!
-        int moffX = state.canvasOffsetX;
-        int moffY = state.canvasOffsetY;
+        // the offsets may change _during this doDraw_ call; Make a copy before
+        // rendering, otherwise there'll be flickering/tearing of tiles!
+        int xMargin = state.scrollOffsetX % state.tileWidth;
+        int yMargin = state.scrollOffsetY % state.tileWidth;
+
+        // in the case we're offset to the right, we need to start rendering 'back' a tile (the longer tile range
+        // handles the case of left offset)
+        if(xMargin > 0){
+            xMargin -= state.tileWidth;
+        }
+        if(yMargin > 0){
+            yMargin -= state.tileWidth;
+        }
+//
+        // todo: remove (won't be necessary when tile gen is correct)
+        canvas.drawRect(new Rect(0, 0, state.screenWidth, state.screenHeight), paint_bg);
+
+        // offset our canvas, so we can draw our whole tiles on with simple 0,0 origin co-ordinates
+        canvas.translate(xMargin,yMargin);
 
         // draw BG
-        canvas.drawRect(new Rect(0, 0, state.width, state.height), paint_bg);
+        canvas.drawRect(new Rect(0, 0, state.screenWidth, state.screenHeight), paint_bg);
 
         if (tileProvider != null) {
 
             List<List<Tile>> visibleGrid = getVisibleTileGrid(state.visibleTileIdRange);
 
-            int size = tileProvider.getTileWidthPixels();
-
-            int yMargin = moffY % size;
-            int xMargin = moffX % size;
-
-            int y = yMargin - size; // start one above
+            int y = 0;
 
             for (List<Tile> tileRow : visibleGrid) {
 
-                int x = xMargin - size; // start with one left
+                int x = 0;
 
                 for (Tile t : tileRow) {
 
@@ -304,6 +341,11 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                             canvas.drawRect(t.getRect(x, y), paint_gridLine);
                         }
 
+                        if(i == 30){
+                            //Log.e(Utils.LOG_TAG,String.format("%20s - drawing at x=%4d,y=%4d",t,x,y));
+                        }
+
+
                     }
                     else {
                         // TODO: could allow provider to give us a 'no data' placeholder tile
@@ -315,19 +357,32 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                         String fmt1 = "Tile(%d,%d)\\n@(%dpx,%dpx)";
                         String msg1 = String.format(fmt1, t.xId, t.yId, x, y);
-                        canvas.drawText(msg1, x + (size / 2), y + (size / 2), paint_msgText);
+                        canvas.drawText(msg1, x + (state.tileWidth / 2), y + (state.tileWidth / 2), paint_msgText);
                     }
 
-                    x += size; // move right one tile width
+                    x += state.tileWidth; // move right one tile screenWidth
                 }
 
-                y += size; // move down one tile width
+                y += state.tileWidth; // move down one tile screenWidth
             }
 
-            if (debugEnabled) {
-                drawDebugBox(canvas,xMargin,yMargin);
+            if(i == 30){
+                //Log.e(Utils.LOG_TAG,String.format("Offset is x=%d(m:%d) and y=%d(m:%d)",moffX, xMargin, moffY, yMargin));
             }
+
+
         }
+
+        // we don't want the debug box scrolling with the tiles, undo the offset
+        canvas.translate(-xMargin,-yMargin);
+        if (debugEnabled) {
+            drawDebugBox(canvas,xMargin,yMargin);
+        }
+
+        if(i<=30){
+            i++;
+        }
+
 
         canvas.restore();
 
@@ -336,23 +391,22 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     private void drawDebugBox(Canvas canvas, int xm, int ym) {
 
         // draw a bunch of debug stuff
-        String fmt1 = "%dx%d[%dx%d], s=%1.3f";
+        String fmt1 = "%dx%d, s=%1.3f";
         String fmt2 = "offx=%d,y=%d, xm=%d, ym=%d";
         String fmt3 = "tiles %s";
-        String msgResAndScale = String.format(fmt1, state.width, state.height,
-                        state.numVisibleTiles_w, state.numVisibleTiles_h,state.scaleFactor);
-        String msgOffset = String.format(fmt2, state.canvasOffsetX, state.canvasOffsetY, xm, ym);
+        String msgResAndScale = String.format(fmt1, state.screenWidth, state.screenHeight,state.scaleFactor);
+        String msgOffset = String.format(fmt2, state.scrollOffsetX, state.scrollOffsetY, xm, ym);
         String msgVisibleIds = String.format(fmt3, state.visibleTileIdRange);
-        String msgProvider = tileProvider.getDebugSummary();
+        String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
         String msgMemory = Utils.getMemStatus();
         Paint paintMem = Utils.isHeapAlmostFull() ? paint_errText : paint_msgText;
 
         float boxWidth = 330, boxHeight = 145;
 
-        float debug_x = state.width - boxWidth;
-        float debug_y = state.height - boxHeight;
+        float debug_x = state.screenWidth - boxWidth;
+        float debug_y = state.screenHeight - boxHeight;
 
-        canvas.drawRect(debug_x, debug_y, state.width, state.height, paint_debugBG);
+        canvas.drawRect(debug_x, debug_y, state.screenWidth, state.screenHeight, paint_debugBG);
 
         canvas.drawText(msgResAndScale, debug_x + boxWidth / 2, debug_y + 30, paint_msgText);
         canvas.drawText(msgOffset, debug_x + boxWidth / 2, debug_y + 55, paint_msgText);
@@ -376,16 +430,17 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     }
 
 
-    class ScreenState {
+    // TODO: persist/restor during suitable lifecycle events
+    class ViewState {
 
-        int width, height;
+        int screenWidth, screenHeight;
 
-        int numVisibleTiles_w, numVisibleTiles_h;
+        int tileWidth;
 
         // ScaleListener sets this from 0.1 to 5.0
         float scaleFactor = 1.0f;
 
-        int canvasOffsetX = 0, canvasOffsetY = 0;
+        int scrollOffsetX = 0, scrollOffsetY = 0;
 
         TileRange visibleTileIdRange;
 
@@ -424,14 +479,16 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             //TileRange bounds = tileProvider.getTileIndexBounds();
 
             //log("scroll x=" + distanceX + ", y=" + distanceY);
-            state.canvasOffsetX -= (int) distanceX;
-            state.canvasOffsetY -= (int) distanceY;
+            state.scrollOffsetX -= (int) distanceX;
+            state.scrollOffsetY -= (int) distanceY;
 
             // TODO: reset!
-            // state.canvasOffsetY = newOffY > bounds.top ? bounds.top : newOffY;
+            // state.scrollOffsetY = newOffY > bounds.top ? bounds.top : newOffY;
             // Log.d(Utils.LOG_TAG, msg);
 
             handleOffsetChange();
+
+            i = 0;
 
             return true;
         }

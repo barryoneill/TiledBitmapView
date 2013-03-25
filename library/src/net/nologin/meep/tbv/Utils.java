@@ -10,7 +10,7 @@ import java.text.DecimalFormat;
 
 public class Utils {
 
-    public static final String LOG_TAG = "TiledBitmapView";
+    public static final String LOG_TAG = "TBV";
 
     private static final DecimalFormat df = new DecimalFormat();
     static {
