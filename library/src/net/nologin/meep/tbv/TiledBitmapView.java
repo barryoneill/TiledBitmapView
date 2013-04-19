@@ -154,21 +154,16 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         int num = (availableSize / tileWidth) + 1;
 
         /* An additional tile if the int division above floored */
-        if(availableSize % tileWidth == 0){
-            return num;
-        }
-        else {
-            return num + 1;
-        }
+        return num + (availableSize % tileWidth == 0 ? 0 : 1);
     }
 
     public void jumpToOriginTile() {
 
-        jumpToTile(0,0);
+        jumpToTileId(0,0);
 
     }
 
-    public void jumpToTile(int x, int y) {
+    public void jumpToTileId(int x, int y) {
 
         if (tileProvider == null) {
             return;
@@ -178,13 +173,14 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
          * when we fill up the remainder of the left area, until there's no room left in the view for more full tiles.
          */
 
-        int numTilesReq = state.screenWidth / state.tileWidth;
-        if (state.screenWidth - numTilesReq * state.tileWidth >= 0) {
-            numTilesReq++;
-        }
-        state.scrollOffsetX = -((numTilesReq * state.tileWidth) - state.screenWidth) / 2;
+        state.scrollOffsetX = (state.screenWidth - state.tileWidth)/2;
 
-        state.scrollOffsetY = 0;
+        state.scrollOffsetY = (state.screenHeight - state.tileWidth) /2;
+
+
+        // values are valid for (0,0) -> now offset for the desired tile ID
+        state.scrollOffsetX -= (state.tileWidth * x);
+        state.scrollOffsetY -= (state.tileWidth * y);
 
         handleOffsetChange();
 
@@ -208,7 +204,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     private Pair<Integer, Integer> getTileRangeForOffset(int offset, int numTiles, int tileWidth) {
 
-        int startTileId = (-numTiles / 2) - (offset / tileWidth);
+        int startTileId = - (offset / tileWidth);
+        //int startTileId = (-numTiles / 2) - (offset / tileWidth);
 
         // positive offset means one tile before (negative handled by numTiles)
         if (offset % tileWidth > 0) {
