@@ -8,7 +8,7 @@ import android.widget.ToggleButton;
 
 public class TBVDemoActivity extends Activity {
 
-    SimpleTileView stv;
+    DemoTileView stv;
     Button btnBackToOrigin;
     ToggleButton btnToggleDebug;
 
@@ -17,7 +17,7 @@ public class TBVDemoActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        stv = (SimpleTileView)findViewById(R.id.simpleTileView);
+        stv = (DemoTileView)findViewById(R.id.simpleTileView);
 
         btnBackToOrigin = (Button)findViewById(R.id.btn_backToOrigin);
         btnToggleDebug = (ToggleButton)findViewById(R.id.btn_debug_toggle);
@@ -38,7 +38,7 @@ public class TBVDemoActivity extends Activity {
             }
         });
 
-        // default to on, TODO: impl view state saving in SimpleTileView
+        // default to on, TODO: impl view state saving in DemoTileView
         btnToggleDebug.setChecked(true);
         stv.setDebugEnabled(true);
 

@@ -5,15 +5,15 @@ import android.util.AttributeSet;
 import net.nologin.meep.tbv.TiledBitmapView;
 
 
-public class SimpleTileView extends TiledBitmapView {
+public class DemoTileView extends TiledBitmapView {
 
-    public SimpleTileView(Context context, AttributeSet attrs) {
+    public DemoTileView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
         // TODO: enable registration without extending
-        SimpleTileProvider sp = (SimpleTileProvider)getTileProvider();
+        DemoTileProvider sp = (DemoTileProvider)getTileProvider();
         if(sp == null){
-            sp = new SimpleTileProvider(getContext());
+            sp = new DemoTileProvider(getContext());
             setTileProvider(sp);
         }
 

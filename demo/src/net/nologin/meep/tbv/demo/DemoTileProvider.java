@@ -10,27 +10,27 @@ import net.nologin.meep.tbv.TileRange;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class SimpleTileProvider implements TileProvider {
+public class DemoTileProvider implements TileProvider {
 
     private Context ctx;
     private static final String DEBUG_SUMMARY_FMT = "STProv[cache=%d,queue=%d]";
 
     // keep a cache of tiles we've already seen or are currently in the process of rendering
-     private final Map<String,SimpleTile> tileCache;
+     private final Map<String,DemoTile> tileCache;
 
     private final Map<String,Bitmap> resCache;
 
     Paint tileTextPaint;
 
     // a queue of tiles to render in the background (in case of slow processing), must be multi-thread-friendly
-    private final List<SimpleTile> renderQueue;
+    private final List<DemoTile> renderQueue;
 
-    public SimpleTileProvider(Context ctx){
+    public DemoTileProvider(Context ctx){
 
         this.ctx = ctx;
 
-        tileCache = new ConcurrentHashMap<String,SimpleTile>();
-        renderQueue = Collections.synchronizedList(new LinkedList<SimpleTile>());
+        tileCache = new ConcurrentHashMap<String,DemoTile>();
+        renderQueue = Collections.synchronizedList(new LinkedList<DemoTile>());
 
         resCache = new HashMap<String, Bitmap>();
 
@@ -45,7 +45,7 @@ public class SimpleTileProvider implements TileProvider {
 
     @Override
     public int getTileWidthPixels() {
-        return SimpleTile.TILE_SIZE;
+        return DemoTile.TILE_SIZE;
     }
 
     @Override
@@ -65,7 +65,7 @@ public class SimpleTileProvider implements TileProvider {
     @Override
     public void generateNextTile(TileRange visible) {
 
-        SimpleTile t;
+        DemoTile t;
 
         // pop the next item to render off our queue
         synchronized (renderQueue){
@@ -127,8 +127,8 @@ public class SimpleTileProvider implements TileProvider {
     public void notifyTileIDRangeChange(TileRange newRange) {
 
         // clear out the bitmaps of any off-screen cached tiles, so we don't gobble ram
-        Collection<SimpleTile> entries = tileCache.values();
-        for(SimpleTile t : entries){
+        Collection<DemoTile> entries = tileCache.values();
+        for(DemoTile t : entries){
             if(t.getBmpData() != null && !newRange.contains(t)){
                t.setBmpData(null);
             }
@@ -143,9 +143,9 @@ public class SimpleTileProvider implements TileProvider {
             for(int y = newRange.top; y <= newRange.bottom; y++) {
                 for(int x = newRange.left; x <= newRange.right; x++) {
 
-                    SimpleTile t = (SimpleTile)getTile(x, y);
+                    DemoTile t = (DemoTile)getTile(x, y);
                     if(t == null || t.getBmpData() == null){
-                        renderQueue.add(new SimpleTile(x,y));
+                        renderQueue.add(new DemoTile(x,y));
                     }
 
                 }
