@@ -159,24 +159,27 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     public void jumpToOriginTile() {
 
-        jumpToTileId(0,0);
+        jumpToTile(0,0);
 
     }
 
-    public void jumpToTileId(int x, int y) {
+    public void jumpToTile(int x, int y) {
 
         if (tileProvider == null) {
             return;
         }
 
-        /* Imagine the (0,0) tile placed on the y axis, half on each side.  Our x-scroll offset is what's left over
-         * when we fill up the remainder of the left area, until there's no room left in the view for more full tiles.
-         */
+        GridAnchor anchor = tileProvider.getGridAnchor();
 
-        state.scrollOffsetX = (state.screenWidth - state.tileWidth)/2;
+        Pair<Integer,Integer> offsets = anchor.getOffsets(state.screenWidth,
+                                                            state.screenHeight,
+                                                            state.tileWidth);
 
-        state.scrollOffsetY = (state.screenHeight - state.tileWidth) /2;
+        state.scrollOffsetX = offsets.first;
+        state.scrollOffsetY = offsets.second;
 
+        // state.scrollOffsetX = (state.screenWidth - state.tileWidth)/2;
+        // state.scrollOffsetY = (state.screenHeight - state.tileWidth) /2;
 
         // values are valid for (0,0) -> now offset for the desired tile ID
         state.scrollOffsetX -= (state.tileWidth * x);

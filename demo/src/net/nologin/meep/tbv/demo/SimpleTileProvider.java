@@ -2,6 +2,7 @@ package net.nologin.meep.tbv.demo;
 
 import android.content.Context;
 import android.graphics.*;
+import net.nologin.meep.tbv.GridAnchor;
 import net.nologin.meep.tbv.Tile;
 import net.nologin.meep.tbv.TileProvider;
 import net.nologin.meep.tbv.TileRange;
@@ -54,6 +55,11 @@ public class SimpleTileProvider implements TileProvider {
          * let us add the required tiles to a queue that we can render in the bg in generateNextTile(). */
         return tileCache.get(x + "_" + y);
 
+    }
+
+    @Override
+    public GridAnchor getGridAnchor() {
+        return GridAnchor.SE;
     }
 
     @Override

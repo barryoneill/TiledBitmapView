@@ -43,4 +43,13 @@ public interface TileProvider {
 
     public String getDebugSummary();
 
+    /**
+     * @return The screen position where the grid origin will be anchored.  That is,
+     * if the view wants to move to a specific tile ID, the view will sroll the grid
+     * until the desired tile is at this position.
+     */
+    public GridAnchor getGridAnchor();
+
+
+
 }
