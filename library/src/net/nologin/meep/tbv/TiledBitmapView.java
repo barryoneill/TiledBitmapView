@@ -136,10 +136,39 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         state.tileWidth = tileProvider.getTileWidthPixels();
 
+        state.tilesW = maxTilesNeeded(width, state.tileWidth);
+        state.tilesH = maxTilesNeeded(height, state.tileWidth);
+
         jumpToOriginTile();
     }
 
+    /**
+     * @return The largest possible number of tiles needed to render a row/column
+     * for the given tile size.  (eg, if two tiles fit perfectly, we'll still need
+     * 3 for then the user scrolls slightly off to one side).
+     */
+    private int maxTilesNeeded(int availableSize, int tileWidth) {
+
+        /* The + 1 ist to cover scrolling (eg, scroll left a bit, and part of a
+         * new tile will appear on the right, but we still need the left tile */
+        int num = (availableSize / tileWidth) + 1;
+
+        /* An additional tile if the int division above floored */
+        if(availableSize % tileWidth == 0){
+            return num;
+        }
+        else {
+            return num + 1;
+        }
+    }
+
     public void jumpToOriginTile() {
+
+        jumpToTile(0,0);
+
+    }
+
+    public void jumpToTile(int x, int y) {
 
         if (tileProvider == null) {
             return;
@@ -164,9 +193,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     private void handleOffsetChange() {
 
-        Pair<Integer, Integer> hInfo = calculate1DTileRange(state.scrollOffsetX, state.screenWidth, state.tileWidth, "X");
-        Pair<Integer, Integer> vInfo = calculate1DTileRange(state.scrollOffsetY, state.screenHeight, state.tileWidth, "Y");
-
+        Pair<Integer, Integer> hInfo = getTileRangeForOffset(state.scrollOffsetX, state.tilesW, state.tileWidth);
+        Pair<Integer, Integer> vInfo = getTileRangeForOffset(state.scrollOffsetY, state.tilesH, state.tileWidth);
 
         TileRange newRange = new TileRange(hInfo.first, vInfo.first, hInfo.second, vInfo.second);
 
@@ -178,37 +206,16 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     }
 
-    String lastMsg1 = "";
-
-    private Pair<Integer, Integer> calculate1DTileRange(int offset, int availableLength, int tileWidth, String XorY) {
-
-        //int numTiles = availableLength / tileWidth; // int division floors
-        int numTiles = (int) Math.ceil(availableLength / (float) tileWidth); // int division floors
+    private Pair<Integer, Integer> getTileRangeForOffset(int offset, int numTiles, int tileWidth) {
 
         int startTileId = (-numTiles / 2) - (offset / tileWidth);
 
-        int remainingOffset = offset % tileWidth;
-
-        String offsetApplied = "";
-        if (remainingOffset != 0) {
-            // we have blank space either side, add another tile and apply appropriate offset to startId
-            numTiles++;
-            // positive offset means one tile before, a negative one means after (handled by increase in numtiles)
-            if (remainingOffset > 0) {
+        // positive offset means one tile before (negative handled by numTiles)
+        if (offset % tileWidth > 0) {
                 startTileId--;
-            }
-
         }
-
-        String msg = String.format("numTiles=%d, startTileId=%d, (offapp=%s)", numTiles, startTileId, offsetApplied);
-        if (!msg.equals(lastMsg1)) {
-            //Log.e(Utils.LOG_TAG, String.format(XorY + ":MOVE - offset=%d, numTiles=%d, startTileId=%d, offapp=%s, remainingOffset=%d", offset, numTiles, startTileId, offsetApplied, remainingOffset));
-            lastMsg1 = msg;
-        }
-
 
         return new Pair<Integer, Integer>(startTileId, startTileId + numTiles - 1);
-
     }
 
 
@@ -283,6 +290,11 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                         view.doDraw(c);
 
+                        /* TODO: in the time it takes doDraw to run, the provider
+                         * might have been able to generate several tiles. Perhaps
+                         * use another thread to better timeslice the CPU between
+                         * these two tasks, rather than alternate them */
+
                         tileProvider.generateNextTile(state.visibleTileIdRange);
 
                     }
@@ -293,7 +305,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 } finally {
                     // do this in a finally so that if an exception is thrown
                     // during the above, we don't leave the Surface in an
-                    // inconsistent bmpData
+                    // inconsistent state
                     if (c != null) {
                         holder.unlockCanvasAndPost(c);
                     }
@@ -438,6 +450,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         int screenWidth, screenHeight;
 
         int tileWidth;
+
+        int tilesW, tilesH;
 
         // ScaleListener sets this from 0.1 to 5.0
         float scaleFactor = 1.0f;

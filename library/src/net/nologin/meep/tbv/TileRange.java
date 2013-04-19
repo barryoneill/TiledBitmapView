@@ -58,7 +58,7 @@ public class TileRange {
     }
 
     public String toString() {
-        return String.format("TR[x=%d to %d,y=%d to %d,n=%d]", left, right, top, bottom, numTiles());
+        return String.format("TR[x=%d to %d,y=%d to %d,n=%d*%d=%d]", left, right, top, bottom, numTilesHorizontal(), numTilesVertical(), numTiles());
     }
 
     @Override
