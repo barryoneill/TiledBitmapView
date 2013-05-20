@@ -44,15 +44,6 @@ public class TileRange {
         return Math.abs(bottom - top + 1);
     }
 
-    public int getWidth(int tileSize) {
-        return numTilesHorizontal() * tileSize;
-    }
-
-    public int getHeight(int tileSize) {
-        return numTilesVertical() * tileSize;
-
-    }
-
     public int numTiles() {
         return numTilesHorizontal() * numTilesVertical();
     }

@@ -26,11 +26,11 @@
 
     </LinearLayout>
 
-    <net.nologin.meep.tbv.demo.SimpleTileView
+    <net.nologin.meep.tbv.demo.DemoTileView
             android:id="@+id/simpleTileView"
             android:layout_width="fill_parent"
             android:layout_height="fill_parent">
 
-    </net.nologin.meep.tbv.demo.SimpleTileView>
+    </net.nologin.meep.tbv.demo.DemoTileView>
 </LinearLayout>
 

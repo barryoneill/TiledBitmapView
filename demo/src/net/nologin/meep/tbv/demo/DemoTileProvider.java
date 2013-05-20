@@ -59,7 +59,7 @@ public class DemoTileProvider implements TileProvider {
 
     @Override
     public GridAnchor getGridAnchor() {
-        return GridAnchor.SE;
+        return GridAnchor.CENTER;
     }
 
     @Override
@@ -114,13 +114,12 @@ public class DemoTileProvider implements TileProvider {
 
     }
 
-//    @Override
-//    public TileRange getTileIndexBounds() {
-//        return new TileRange(Integer.MIN_VALUE,Integer.MIN_VALUE,Integer.MAX_VALUE,Integer.MAX_VALUE);
-//    }
 
-    public boolean scrollPastBoundaries(){
-        return false;
+    @Override
+    public Integer[] getTileIndexBounds(){
+
+        return null; // no limit to scrolling
+
     }
 
     @Override

@@ -1,7 +1,9 @@
 package net.nologin.meep.tbv;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.*;
+import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Pair;
@@ -11,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+@TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
 public abstract class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callback {
 
     GestureDetector gestureDetector;
@@ -56,7 +59,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         paint_debugTileTxt = new Paint(paint_debugBoxTxt);
         paint_debugTileTxt.setTextSize(32);
-        paint_debugTileTxt.setShadowLayer(5,2,2,Color.BLACK);
+        paint_debugTileTxt.setShadowLayer(5, 2, 2, Color.BLACK);
 
         // TODO:
 
@@ -166,38 +169,68 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     public void jumpToTile(int x, int y) {
 
         if (tileProvider == null) {
+            Log.d(Utils.LOG_TAG, "Provider not ready yet, cannot go to tile");
+            return;
+        }
+
+        if (state.screenWidth == 0) {
+            Log.d(Utils.LOG_TAG, "Surface not ready yet, cannot go to tile");
             return;
         }
 
         GridAnchor anchor = tileProvider.getGridAnchor();
 
-        Pair<Integer,Integer> offsets = anchor.getOffsets(state.screenWidth,
-                                                            state.screenHeight,
-                                                            state.tileWidth);
+        Pair<Integer, Integer> originOffset = anchor.getOriginOffset(state.screenWidth,
+                state.screenHeight,
+                state.tileWidth);
 
-        state.scrollOffsetX = offsets.first;
-        state.scrollOffsetY = offsets.second;
+        int newOffX = originOffset.first - (state.tileWidth * x);
+        int newOffY = originOffset.second - (state.tileWidth * y);
 
-        // state.scrollOffsetX = (state.screenWidth - state.tileWidth)/2;
-        // state.scrollOffsetY = (state.screenHeight - state.tileWidth) /2;
-
-        // values are valid for (0,0) -> now offset for the desired tile ID
-        state.scrollOffsetX -= (state.tileWidth * x);
-        state.scrollOffsetY -= (state.tileWidth * y);
-
-        handleOffsetChange();
+        validateAndApplyOffset(newOffX, newOffY);
 
 
     }
 
-    private void handleOffsetChange() {
+    private void validateAndApplyOffset(int newOffX, int newOffY) {
 
-        Pair<Integer, Integer> hInfo = getTileRangeForOffset(state.scrollOffsetX, state.tilesW, state.tileWidth);
-        Pair<Integer, Integer> vInfo = getTileRangeForOffset(state.scrollOffsetY, state.tilesH, state.tileWidth);
+        Pair<Integer, Integer> range_horiz = getTileRangeForOffset(newOffX, state.tilesW, state.tileWidth);
+        Pair<Integer, Integer> range_vert = getTileRangeForOffset(newOffY, state.tilesH, state.tileWidth);
 
-        TileRange newRange = new TileRange(hInfo.first, vInfo.first, hInfo.second, vInfo.second);
+        Integer[] bounds = tileProvider.getTileIndexBounds();
+        if (bounds != null && bounds.length != 4) {
+            Log.w(Utils.LOG_TAG, "Provider '" + tileProvider + "' provided " + bounds.length
+                    + " elements, must be 4 - Ignoring.");
+            bounds = null;
+        }
 
-        // avoid unnecessary provider notifications
+        if (bounds != null && state.visibleTileIdRange != null) {
+
+            /* Important to check horizontal and vertical bounds independently, so that diagonal swipes that
+               hit a boundary continue to update the scroll.  (Eg, if I'm at the top boundary, and swipe up-left,
+               I still want the left part of that scroll to be obeyed */
+            // left, top, right, and bottom ID
+            if ((bounds[0] != null && range_horiz.first < bounds[0])
+                 || (bounds[2] != null && range_horiz.second > bounds[2])) {
+                // Horizontal check fails, keep existing values
+                range_horiz = new Pair<Integer, Integer>(state.visibleTileIdRange.left, state.visibleTileIdRange.right);
+                newOffX = state.scrollOffsetX;
+            }
+
+            if ((bounds[1] != null && range_vert.first < bounds[1])
+                 || (bounds[3] != null && range_vert.second > bounds[3])) {
+                // Vertical check fails, keep existing values
+                range_vert = new Pair<Integer, Integer>(state.visibleTileIdRange.top, state.visibleTileIdRange.bottom);
+                newOffY = state.scrollOffsetY;
+            }
+
+        }
+
+        TileRange newRange = new TileRange(range_horiz.first, range_vert.first, range_horiz.second, range_vert.second);
+        state.scrollOffsetX = newOffX;
+        state.scrollOffsetY = newOffY;
+
+        // call notify only on range change
         if (state.visibleTileIdRange == null || !newRange.equals(state.visibleTileIdRange)) {
             state.visibleTileIdRange = newRange;
             tileProvider.notifyTileIDRangeChange(state.visibleTileIdRange);
@@ -207,12 +240,12 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     private Pair<Integer, Integer> getTileRangeForOffset(int offset, int numTiles, int tileWidth) {
 
-        int startTileId = - (offset / tileWidth);
+        int startTileId = -(offset / tileWidth);
         //int startTileId = (-numTiles / 2) - (offset / tileWidth);
 
         // positive offset means one tile before (negative handled by numTiles)
         if (offset % tileWidth > 0) {
-                startTileId--;
+            startTileId--;
         }
 
         return new Pair<Integer, Integer>(startTileId, startTileId + numTiles - 1);
@@ -315,8 +348,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         }
 
     }
-
-
 
 
     public void doDraw(Canvas canvas) {
@@ -492,13 +523,11 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         @Override
         public boolean onScroll(MotionEvent motionEvent, MotionEvent motionEvent1, float distanceX, float distanceY) {
 
-            //log("scroll x=" + distanceX + ", y=" + distanceY);
-            state.scrollOffsetX -= (int) distanceX;
-            state.scrollOffsetY -= (int) distanceY;
 
-            // TODO: implement scroll boundaries if specified
+            int newOffX = state.scrollOffsetX - (int) distanceX;
+            int newOffY = state.scrollOffsetY - (int) distanceY;
 
-            handleOffsetChange();
+            validateAndApplyOffset(newOffX, newOffY);
 
             return true;
         }

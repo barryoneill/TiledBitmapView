@@ -15,7 +15,7 @@ public enum GridAnchor {
     SW, S, SE;
 
 
-    final Pair<Integer,Integer> getOffsets(int width, int height, int tilew) {
+    final Pair<Integer,Integer> getOriginOffset(int width, int height, int tilew) {
 
         // default to 0,0 (covers left hand side and across top)
         int offX=0, offY=0;

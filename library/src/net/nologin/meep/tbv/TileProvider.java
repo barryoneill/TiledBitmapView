@@ -1,6 +1,7 @@
 package net.nologin.meep.tbv;
 
 
+
 public interface TileProvider {
 
     /**
@@ -27,9 +28,19 @@ public interface TileProvider {
     public void generateNextTile(TileRange visible);
 
     /**
-     * @return true // TODO: doc
+     * Allows the provider to specify tile ID boundaries. If specified, scrolling past that tile ID will be prohibited.
+     * <br/>
+     * Work in progress - Unspecified behaviour occurs if the bounds are too restrictive (ie, less than the
+     * initial range displayed on the screen.  This is intended more for limiting excessive scrolling if
+     * required, or in the case (for example) where you use the <code>getGridAnchor</code> to anchor y=0 at
+     * the top of the screen, and set a top bound of 0 to prevent the user to scroll higher than that.
+     *
+     * @return <code>null</code> if there are no restrictions on scrolling.  Otherwise, a 4-element Integer
+     * array should be specified, specifying the left, top, right, and bottom ID limits respectively.  Each
+     * individual element can be left <code>null</code>.  Eg, to enforce that scrolling up can't go beyond
+     * y=-5, then specify <code>{null,-5,null,null}</code>.  Invalid arrays will be ignored (same as null).
      */
-    public boolean scrollPastBoundaries();
+    public Integer[] getTileIndexBounds();
 
     /**
      * Tell the provider which tiles are currently visible in the view, giving the provider
