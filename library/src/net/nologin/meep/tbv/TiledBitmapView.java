@@ -9,26 +9,23 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.*;
 
-import java.util.ArrayList;
-import java.util.List;
-
-
 @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
 public abstract class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callback {
 
-    GestureDetector gestureDetector;
-    ScaleGestureDetector scaleDetector;
+    final GestureDetector gestureDetector;
+    final ScaleGestureDetector scaleDetector;
 
-    Paint paint_bg;
-    Paint paint_debugTileTxt;
-    Paint paint_debugBoxTxt;
-    Paint paint_errText;
-    Paint paint_gridLine;
-    Paint paint_debugBG;
+    final Paint paint_bg;
+    final Paint paint_debugTileTxt;
+    final Paint paint_debugBoxTxt;
+    final Paint paint_errText;
+    final Paint paint_gridLine;
+    final Paint paint_debugBG;
 
-    TileGenerationThread tgThread;
+    TileGridDrawThread tileDrawThread;
+    TileGenerationThread tileGenThread;
 
-    ViewState state;
+    final ViewState state;
 
     TileProvider tileProvider;
 
@@ -43,7 +40,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         // TODO: persist/restore during suitable lifecycle events
         state = new ViewState();
-        tgThread = new TileGenerationThread(holder, this);
+        tileDrawThread = new TileGridDrawThread(holder, this);
+        tileGenThread = new TileGenerationThread();
 
         // background paint
         paint_bg = new Paint();
@@ -60,8 +58,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         paint_debugTileTxt = new Paint(paint_debugBoxTxt);
         paint_debugTileTxt.setTextSize(32);
         paint_debugTileTxt.setShadowLayer(5, 2, 2, Color.BLACK);
-
-        // TODO:
 
         paint_errText = new Paint(paint_debugBoxTxt);
         paint_errText.setColor(Color.RED);
@@ -108,22 +104,39 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        if (!tgThread.isAlive()) {
-            tgThread = new TileGenerationThread(holder, this);
-            tgThread.setRunning(true);
-            tgThread.start();
+        if (!tileGenThread.isAlive()) {
+            tileGenThread = new TileGenerationThread();
+            tileGenThread.setRunning(true);
+            tileGenThread.start();
+        }
+        if (!tileDrawThread.isAlive()) {
+            tileDrawThread = new TileGridDrawThread(holder, this);
+            tileDrawThread.setRunning(true);
+            tileDrawThread.start();
         }
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
 
-        // Based on android example 'LunarLander' app
+        /* Based on the surfaceDestroyed() method in the 'LunarLander' sample app,
+         * Ensure we reconnect to both threads and have them see that we set the running flag to false.
+         */
         boolean retry = true;
-        tgThread.setRunning(false);
+        tileDrawThread.setRunning(false);
         while (retry) {
             try {
-                tgThread.join();
+                tileDrawThread.join();
+                retry = false;
+            } catch (InterruptedException ignored) {
+            }
+        }
+
+        retry = true;
+        tileGenThread.setRunning(false);
+        while (retry) {
+            try {
+                tileGenThread.join();
                 retry = false;
             } catch (InterruptedException ignored) {
             }
@@ -147,8 +160,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     /**
      * @return The largest possible number of tiles needed to render a row/column
-     * for the given tile size.  (eg, if two tiles fit perfectly, we'll still need
-     * 3 for then the user scrolls slightly off to one side).
+     *         for the given tile size.  (eg, if two tiles fit perfectly, we'll still need
+     *         3 for then the user scrolls slightly off to one side).
      */
     private int maxTilesNeeded(int availableSize, int tileWidth) {
 
@@ -162,7 +175,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     public void jumpToOriginTile() {
 
-        jumpToTile(0,0);
+        jumpToTile(0, 0);
 
     }
 
@@ -211,14 +224,14 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                I still want the left part of that scroll to be obeyed */
             // left, top, right, and bottom ID
             if ((bounds[0] != null && range_horiz.first < bounds[0])
-                 || (bounds[2] != null && range_horiz.second > bounds[2])) {
+                    || (bounds[2] != null && range_horiz.second > bounds[2])) {
                 // Horizontal check fails, keep existing values
                 range_horiz = new Pair<Integer, Integer>(state.visibleTileIdRange.left, state.visibleTileIdRange.right);
                 newOffX = state.scrollOffsetX;
             }
 
             if ((bounds[1] != null && range_vert.first < bounds[1])
-                 || (bounds[3] != null && range_vert.second > bounds[3])) {
+                    || (bounds[3] != null && range_vert.second > bounds[3])) {
                 // Vertical check fails, keep existing values
                 range_vert = new Pair<Integer, Integer>(state.visibleTileIdRange.top, state.visibleTileIdRange.bottom);
                 newOffY = state.scrollOffsetY;
@@ -262,41 +275,93 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         }
     }
 
-    private List<List<Tile>> getVisibleTileGrid(TileRange tileIdRange) {
+    private void refreshVisibleTileGrid() {
 
-        List<List<Tile>> result = new ArrayList<List<Tile>>();
+        if (state.visibleTileIdRange == null) {
+            return;
+        }
 
-        if (tileIdRange == null) {
-            return result;
+        // only create the visibleTiles array when necessary
+        if(state.visibleTiles == null
+                || state.visibleTiles.length != state.tilesH
+                || state.visibleTiles[0].length != state.tilesW){
+            state.visibleTiles = new Tile[state.tilesH][state.tilesW];
+
         }
 
         Tile t;
 
-        for (int y = tileIdRange.top; y <= tileIdRange.bottom; y++) {
+        int top = state.visibleTileIdRange.top;
+        int left = state.visibleTileIdRange.left;
 
-            List<Tile> curRow = new ArrayList<Tile>();
-            for (int x = tileIdRange.left; x <= tileIdRange.right; x++) {
-                t = tileProvider.getTile(x, y);
-                if (t == null) {
-                    t = new MissingTile(x, y); // always return a grid of non-null tiles
+        int xId, yId;
+
+        try {
+
+            for (int y = 0; y < state.tilesH; y++) {
+
+                for (int x = 0; x < state.tilesW; x++) {
+
+                    yId = y + top;
+                    xId = x + left;
+
+                    t = tileProvider.getTile(xId, yId);
+                    if (t == null) {
+                        t = new MissingTile(xId, yId); // always return a grid of non-null tiles
+                    }
+
+                    state.visibleTiles[y][x] = t;
                 }
-                curRow.add(t);
+
             }
-            result.add(curRow);
+
+        }
+        catch(ArrayIndexOutOfBoundsException er) {
+            throw new IllegalArgumentException("Caugh AIOBE with tileRange '" + state.visibleTileIdRange + "', +e=" + er.getMessage());
         }
 
-        return result;
+
+
+    }
+
+    class TileGenerationThread extends Thread {
+
+        private boolean running = false;
+
+        public void setRunning(boolean running) {
+            this.running = running;
+        }
+
+        @Override
+        public void run() {
+
+            while (running) {
+
+                if (tileProvider == null) {
+                    continue;
+                }
+
+                tileProvider.generateNextTile(state.visibleTileIdRange);
+
+            }
+
+        }
+
     }
 
 
-    class TileGenerationThread extends Thread {
+    class TileGridDrawThread extends Thread {
+
+        //Measure frames per second.
+        long fpsTimeNow, fpsTimePrev;
+        int fpsFrameCnt = 0, fpsAvg = 0;
 
         private final SurfaceHolder holder;
         private TiledBitmapView view;
         private boolean running = false;
 
 
-        public TileGenerationThread(SurfaceHolder holder, TiledBitmapView view) {
+        public TileGridDrawThread(SurfaceHolder holder, TiledBitmapView view) {
             this.holder = holder;
             this.view = view;
         }
@@ -315,27 +380,17 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 c = null;
 
                 try {
+
+
                     c = holder.lockCanvas(null);
                     if (c == null || tileProvider == null) {
                         continue; // is this right?
                     }
                     synchronized (holder) {
-
                         view.doDraw(c);
-
-                        /* TODO: in the time it takes doDraw to run, the provider
-                         * might have been able to generate several tiles. Perhaps
-                         * use another thread to better timeslice the CPU between
-                         * these two tasks, rather than alternate them */
-
-                        tileProvider.generateNextTile(state.visibleTileIdRange);
-
                     }
-                    Thread.sleep(5); // so we can interact in a reasonable time
-
-                } catch (InterruptedException e) {
-                    // nop
-                } finally {
+                }
+                finally {
                     // do this in a finally so that if an exception is thrown
                     // during the above, we don't leave the Surface in an
                     // inconsistent state
@@ -343,6 +398,24 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                         holder.unlockCanvasAndPost(c);
                     }
                 }
+
+                // NB: do not sleep while the canvas is locked
+                try{
+                    Thread.sleep(5);
+                }
+                catch(InterruptedException ignored){}
+
+                if (debugEnabled) {
+                    // calculate draws per second
+                    fpsTimeNow = System.currentTimeMillis();
+                    fpsFrameCnt++;
+                    if (fpsTimeNow - fpsTimePrev > 1000) {
+                        fpsTimePrev = fpsTimeNow;
+                        fpsAvg = fpsFrameCnt;
+                        fpsFrameCnt = 0;
+                    }
+                }
+
             }
 
         }
@@ -353,6 +426,10 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     public void doDraw(Canvas canvas) {
 
         super.onDraw(canvas);
+
+        if (state.tileWidth <= 0) {
+            return;
+        }
 
         canvas.save();
 
@@ -369,8 +446,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         if (yMargin > 0) {
             yMargin -= state.tileWidth;
         }
-//
-        // todo: remove (won't be necessary when tile gen is correct)
+
+        // blank out previous contents of screen
         canvas.drawRect(new Rect(0, 0, state.screenWidth, state.screenHeight), paint_bg);
 
         // offset our canvas, so we can draw our whole tiles on with simple 0,0 origin co-ordinates
@@ -381,11 +458,11 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         if (tileProvider != null) {
 
-            List<List<Tile>> visibleGrid = getVisibleTileGrid(state.visibleTileIdRange);
+            refreshVisibleTileGrid();
 
             int y = 0;
 
-            for (List<Tile> tileRow : visibleGrid) {
+            for (Tile[] tileRow : state.visibleTiles) {
 
                 int x = 0;
 
@@ -437,17 +514,17 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     private void drawDebugBox(Canvas canvas, int xm, int ym) {
 
         // draw a bunch of debug stuff
-        String fmt1 = "%dx%d, s=%1.3f";
+        String fmt1 = "%dx%d, s=%1.3f, %2dfps";
         String fmt2 = "offx=%d,y=%d, xm=%d, ym=%d";
         String fmt3 = "tiles %s";
-        String msgResAndScale = String.format(fmt1, state.screenWidth, state.screenHeight, state.scaleFactor);
+        String msgResAndScale = String.format(fmt1, state.screenWidth, state.screenHeight, state.scaleFactor, tileDrawThread.fpsAvg);
         String msgOffset = String.format(fmt2, state.scrollOffsetX, state.scrollOffsetY, xm, ym);
         String msgVisibleIds = String.format(fmt3, state.visibleTileIdRange);
         String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
-        String msgMemory = Utils.getMemStatus();
+        //String msgMemory = Utils.getMemStatus();
         Paint paintMem = Utils.isHeapAlmostFull() ? paint_errText : paint_debugBoxTxt;
 
-        float boxWidth = 330, boxHeight = 145;
+        float boxWidth = 350, boxHeight = 145 - 35;
 
         float debug_x = state.screenWidth - boxWidth;
         float debug_y = state.screenHeight - boxHeight;
@@ -458,7 +535,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         canvas.drawText(msgOffset, debug_x + boxWidth / 2, debug_y + 55, paint_debugBoxTxt);
         canvas.drawText(msgVisibleIds, debug_x + boxWidth / 2, debug_y + 80, paint_debugBoxTxt);
         canvas.drawText(msgProvider, debug_x + boxWidth / 2, debug_y + 105, paint_debugBoxTxt);
-        canvas.drawText(msgMemory, debug_x + boxWidth / 2, debug_y + 130, paintMem);
+        //canvas.drawText(msgMemory, debug_x + boxWidth / 2, debug_y + 130, paintMem);
 
 
     }
@@ -483,6 +560,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         int tileWidth;
 
         int tilesW, tilesH;
+        Tile[][] visibleTiles;
 
         // ScaleListener sets this from 0.1 to 5.0
         float scaleFactor = 1.0f;

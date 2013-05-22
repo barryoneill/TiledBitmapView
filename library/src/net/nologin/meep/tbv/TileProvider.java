@@ -46,7 +46,7 @@ public interface TileProvider {
      * Tell the provider which tiles are currently visible in the view, giving the provider
      * an opportunity to add new tiles to its rendering queue, or to remove stale tiles
      * from any caches.
-     * @param newRange The boundaries of the tile IDs now on display.
+     * @param newRange The boundaries of the tile IDs fpsTimeNow on display.
      */
     public void notifyTileIDRangeChange(TileRange newRange);
 
