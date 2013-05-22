@@ -63,21 +63,21 @@ public class DemoTileProvider implements TileProvider {
     }
 
     @Override
-    public void generateNextTile(TileRange visible) {
+    public boolean generateNextTile(TileRange visible) {
 
         DemoTile t;
 
         // pop the next item to render off our queue
         synchronized (renderQueue){
             if(renderQueue.isEmpty()){
-                return;
+                return false;
             }
             t = renderQueue.remove(0);
         }
 
         // anything to render?
         if(t == null || t.getBmpData() != null){
-            return; // nothing to render
+            return false; // nothing to render
         }
 
 
@@ -111,6 +111,7 @@ public class DemoTileProvider implements TileProvider {
         // put it in the cache for the UI thread to find via getTile()
         tileCache.put(t.xId + "_" + t.yId, t);
 
+        return true;
 
     }
 
@@ -155,9 +156,9 @@ public class DemoTileProvider implements TileProvider {
     }
 
     @Override
-    public void notifyZoomFactorChangeTEMP(float newZoom) {
+    public void notifyZoomFactorChange(float newZoom) {
 
-        // TODO:
+
 
     }
 

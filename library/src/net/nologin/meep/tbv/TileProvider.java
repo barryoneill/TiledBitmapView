@@ -11,7 +11,10 @@ public interface TileProvider {
     public int getTileWidthPixels();
 
     /**
-     * Get the specified tile.
+     * Get the specified tile.  This should be _fast_, otherwise it will slow down the rendering rate.  If it takes
+     * time to render tiles, consider using a queueing system. Return null for now (results in an empty square rendered
+     * for that particular frame), and let the asynchronous calls to {@link TileProvider#generateNextTile(TileRange)}
+     * give you a chance to process the tiles.
      * @param x The x-attribute of the id
      * @param y The y-attribute of the id
      * @return The tile.
@@ -19,13 +22,15 @@ public interface TileProvider {
     public Tile getTile(int x, int y);
 
     /**
-     * Called from a background thread, this gives the provider a chance to render
-     * the bitmap contents of next tile in its queue, if any.
+     * Called from a background thread, this gives the provider a chance to do asynchronous bitmap rendering of any
+     * work in the queue without holding up the UI.
      * @param visible Some providers might use this 'turn' to process a tile not currently displayed on
      *                         the screen, and can use this rect to check if the tile currently being processed is
      *                         on screen or not.
+     * @return true to indicate processing took place during this call, false if no work needed doing.  This does not
+     * guarantee any behaviour by the view, but may be used as a performance hueristic.
      */
-    public void generateNextTile(TileRange visible);
+    public boolean generateNextTile(TileRange visible);
 
     /**
      * Allows the provider to specify tile ID boundaries. If specified, scrolling past that tile ID will be prohibited.
@@ -50,8 +55,16 @@ public interface TileProvider {
      */
     public void notifyTileIDRangeChange(TileRange newRange);
 
-    public void notifyZoomFactorChangeTEMP(float newZoom);
+    /** Called when the user does a zoom pinch
+     * @param newZoom a float value from 1.0 to 5.0 (initial is 1.0)
+     */
+    public void notifyZoomFactorChange(float newZoom);
 
+    /**
+     * @return A string for use in the 'debug' mode of the view to show a short summary of the state of
+     * the provider, eg "MyProv[cache=100,queue=0]".  Although only called when debug is enabled, try
+     * and keep it fast.
+     */
     public String getDebugSummary();
 
     /**
