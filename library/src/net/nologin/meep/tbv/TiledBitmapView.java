@@ -449,13 +449,13 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         }
 
         // blank out previous contents of screen
-        canvas.drawRect(new Rect(0, 0, state.screenW, state.screenH), paint_bg);
+        canvas.drawRect(0, 0, state.screenW, state.screenH, paint_bg);
 
         // offset our canvas, so we can draw our whole tiles on with simple 0,0 origin co-ordinates
         canvas.translate(xMargin, yMargin);
 
         // draw BG
-        canvas.drawRect(new Rect(0, 0, state.screenW, state.screenH), paint_bg);
+        canvas.drawRect(0, 0, state.screenW, state.screenH, paint_bg);
 
         if (tileProvider != null) {
 
