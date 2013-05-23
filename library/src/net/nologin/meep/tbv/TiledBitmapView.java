@@ -469,7 +469,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                 for (Tile t : tileRow) {
 
-                    Bitmap bmp = t.getBmpData();
+                    Bitmap bmp = t.bmpData;
                     if (bmp != null) {
 
                         canvas.drawBitmap(bmp, x, y, null);

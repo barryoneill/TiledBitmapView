@@ -16,7 +16,7 @@ public class DemoTileProvider implements TileProvider {
     private static final String DEBUG_SUMMARY_FMT = "STProv[cache=%d,queue=%d]";
 
     // keep a cache of tiles we've already seen or are currently in the process of rendering
-     private final Map<String,DemoTile> tileCache;
+     private final Map<Long,DemoTile> tileCache;
 
     private final Map<String,Bitmap> resCache;
 
@@ -29,7 +29,7 @@ public class DemoTileProvider implements TileProvider {
 
         this.ctx = ctx;
 
-        tileCache = new ConcurrentHashMap<String,DemoTile>();
+        tileCache = new ConcurrentHashMap<Long,DemoTile>();
         renderQueue = Collections.synchronizedList(new LinkedList<DemoTile>());
 
         resCache = new HashMap<String, Bitmap>();
@@ -53,7 +53,7 @@ public class DemoTileProvider implements TileProvider {
 
         /* don't render the tile here, that could hold up the UI.  The call to notifyTileIDRangeChange() will
          * let us add the required tiles to a queue that we can render in the bg in generateNextTile(). */
-        return tileCache.get(x + "_" + y);
+        return tileCache.get(Tile.getCacheKey(x,y));
 
     }
 
@@ -76,7 +76,7 @@ public class DemoTileProvider implements TileProvider {
         }
 
         // anything to render?
-        if(t == null || t.getBmpData() != null){
+        if(t == null || t.bmpData != null){
             return false; // nothing to render
         }
 
@@ -106,10 +106,10 @@ public class DemoTileProvider implements TileProvider {
         //Canvas c = new Canvas(bmp);
         //c.drawText(t.xId+","+t.yId, 30, 80, tileTextPaint);
 
-        t.setBmpData(bmp);
+        t.bmpData = bmp;
 
         // put it in the cache for the UI thread to find via getTile()
-        tileCache.put(t.xId + "_" + t.yId, t);
+        tileCache.put(t.cacheKey, t);
 
         return true;
 
@@ -129,8 +129,8 @@ public class DemoTileProvider implements TileProvider {
         // clear out the bitmaps of any off-screen cached tiles, so we don't gobble ram
         Collection<DemoTile> entries = tileCache.values();
         for(DemoTile t : entries){
-            if(t.getBmpData() != null && !newRange.contains(t)){
-               t.setBmpData(null);
+            if(t.bmpData != null && !newRange.contains(t)){
+               t.bmpData = null;
             }
 
         }
@@ -144,7 +144,7 @@ public class DemoTileProvider implements TileProvider {
                 for(int x = newRange.left; x <= newRange.right; x++) {
 
                     DemoTile t = (DemoTile)getTile(x, y);
-                    if(t == null || t.getBmpData() == null){
+                    if(t == null || t.bmpData == null){
                         renderQueue.add(new DemoTile(x,y));
                     }
 
