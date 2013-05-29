@@ -1,7 +1,10 @@
 package net.nologin.meep.tbv;
 
 import android.graphics.Bitmap;
-import android.graphics.Rect;import java.lang.String;
+import android.graphics.Rect;
+import android.util.Log;
+
+import java.lang.String;
 
 public class Tile {
 
@@ -9,7 +12,9 @@ public class Tile {
     public final int xId;
     public final int yId;
     public final long cacheKey;
-    public Bitmap bmpData; // not final, can be cleared
+
+    // TODO: doc
+    private Bitmap bmpData;
 
     public Tile(int xId, int yId, int size) {
 
@@ -26,6 +31,24 @@ public class Tile {
     public Rect getRect(int offsetX, int offsetY){
         return new Rect(offsetX, offsetY, offsetX + size, offsetY + size);
     }
+
+    public Bitmap getBmpData(){
+        return bmpData;
+    }
+
+    // TODO: doc
+    public int getBmpHashcode(){
+        return bmpData == null ? 0 : bmpData.hashCode();
+    }
+
+    public void setBmpData(Bitmap bmpData){
+        this.bmpData = bmpData;
+    }
+
+    public void clearBmpData(){
+        this.bmpData = null;
+    }
+
 
     public String toString() {
 

@@ -11,18 +11,18 @@
             android:layout_height="wrap_content"
             android:gravity="center">
 
-        <ToggleButton
-                android:id="@+id/btn_debug_toggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textOn="Debug On"
-                android:textOff="Debug Off"/>
-
         <Button
                 android:id="@+id/btn_backToOrigin"
-                android:layout_width="wrap_content"
+                android:layout_width="150dp"
                 android:layout_height="wrap_content"
-                android:text="Back To Origin"/>
+                android:text="Jump To Origin"/>
+
+        <ToggleButton
+                android:id="@+id/btn_debug_toggle"
+                android:layout_width="150dp"
+                android:layout_height="wrap_content"
+                android:textOn="Debug Is On"
+                android:textOff="Debug Is Off"/>
 
     </LinearLayout>
 

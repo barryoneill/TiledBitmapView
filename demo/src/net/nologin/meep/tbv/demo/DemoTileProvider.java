@@ -76,7 +76,7 @@ public class DemoTileProvider implements TileProvider {
         }
 
         // anything to render?
-        if(t == null || t.bmpData != null){
+        if(t == null || t.getBmpData() != null){
             return false; // nothing to render
         }
 
@@ -106,7 +106,7 @@ public class DemoTileProvider implements TileProvider {
         //Canvas c = new Canvas(bmp);
         //c.drawText(t.xId+","+t.yId, 30, 80, tileTextPaint);
 
-        t.bmpData = bmp;
+        t.setBmpData(bmp);
 
         // put it in the cache for the UI thread to find via getTile()
         tileCache.put(t.cacheKey, t);
@@ -129,8 +129,8 @@ public class DemoTileProvider implements TileProvider {
         // clear out the bitmaps of any off-screen cached tiles, so we don't gobble ram
         Collection<DemoTile> entries = tileCache.values();
         for(DemoTile t : entries){
-            if(t.bmpData != null && !newRange.contains(t)){
-               t.bmpData = null;
+            if(t.getBmpData() != null && !newRange.contains(t)){
+               t.clearBmpData();
             }
 
         }
@@ -144,14 +144,13 @@ public class DemoTileProvider implements TileProvider {
                 for(int x = newRange.left; x <= newRange.right; x++) {
 
                     DemoTile t = (DemoTile)getTile(x, y);
-                    if(t == null || t.bmpData == null){
+                    if(t == null || t.getBmpData() == null){
                         renderQueue.add(new DemoTile(x,y));
                     }
 
                 }
             }
         }
-
 
     }
 
