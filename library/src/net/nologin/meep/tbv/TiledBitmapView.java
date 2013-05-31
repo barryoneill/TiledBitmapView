@@ -9,11 +9,10 @@ import android.util.Log;
 import android.util.Pair;
 import android.view.*;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
 public abstract class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callback {
 
+    //<editor-fold desc="setup stuff">
     final GestureDetector gestureDetector;
     final ScaleGestureDetector scaleDetector;
 
@@ -45,7 +44,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         // background paint
         paint_bg = new Paint();
-        paint_bg.setColor(Color.DKGRAY); // LTGRAY
+        paint_bg.setColor(Color.BLACK); // LTGRAY
         paint_bg.setStyle(Paint.Style.FILL);
 
         // background status text paint (needed?)
@@ -149,6 +148,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             }
         }
     }
+    //</editor-fold>
 
 
     @Override
@@ -252,6 +252,18 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         state.scrollOffsetX = newOffX;
         state.scrollOffsetY = newOffY;
 
+        state.xCanvasOffset = state.scrollOffsetX % state.tileW;
+        state.yCanvasOffset = state.scrollOffsetY % state.tileW;
+
+        // in the case we're offset to the right, we need to start rendering 'back' a tile (the longer tile range
+        // handles the case of left offset)
+        if (state.xCanvasOffset > 0) {
+            state.xCanvasOffset -= state.tileW;
+        }
+        if (state.yCanvasOffset > 0) {
+            state.yCanvasOffset -= state.tileW;
+        }
+
         // call notify only on range change
         if (state.visibleTileIdRange == null || !newRange.equals(state.visibleTileIdRange)) {
             state.visibleTileIdRange = newRange;
@@ -280,84 +292,27 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     }
 
 
-
-    // return value indicates if there was a change in tile content requiring a redraw
-    private boolean refreshTileGridFromProvider() {
-
-        if (state.visibleTileIdRange == null) {
-            return false;
-        }
-
-        // only create the visibleTiles array when necessary
-        if(state.visibleTiles == null ||
-                state.visibleTiles.length != state.tilesH || state.visibleTiles[0].length != state.tilesW){
-            state.visibleTiles = new Tile[state.tilesH][state.tilesW];
-
-            state.visibleTilesHistory = new int[state.tilesH][state.tilesW];
-
-        }
-
-
-        boolean renderRequired = false;
-        Tile tile_new;
-
-        int top = state.visibleTileIdRange.top;
-        int left = state.visibleTileIdRange.left;
-
-        int xId, yId;
-
-        for (int y = 0; y < state.tilesH; y++) {
-
-            for (int x = 0; x < state.tilesW; x++) {
-
-                yId = y + top;
-                xId = x + left;
-
-                tile_new = tileProvider.getTile(xId, yId);
-
-                if (tile_new == null) {
-
-                    if(state.visibleTiles[y][x] != null){
-                        renderRequired = true; // wasn't null, now is!
-                    }
-
-                    tile_new = new MissingTile(xId, yId); // always return a grid of non-null tiles
-                }
-                else{ // tile_new != null
-
-                    if(state.visibleTiles[y][x] == null) {
-                        renderRequired = true; // was null, now isn't!
-                    }
-                    else{
-                        // old and new tiles were non-null
-                        if(state.visibleTilesHistory[y][x] != tile_new.getBmpHashcode()){
-                            renderRequired = true;
-                        }
-                    }
-
-                }
-
-                state.visibleTiles[y][x] = tile_new;
-            }
-
-        }
-
-
-
-        return renderRequired;
-
-    }
-
+    /**
+     * Very simple thread class, whose only job is to run in the background and continually call the tileProvider
+     * and give it a chance to process any queued tasks it has.  It then sets the 'tileDataChanged' boolean flag
+     * to true, which is read by the rendering thread when querying if there is possibly new data to render.
+     */
     class TileManagementThread extends Thread {
 
         private boolean running = false;
 
-        public AtomicBoolean tileDataChanged = new AtomicBoolean(true);
+        private boolean dataChanged = true;
 
         public void setRunning(boolean running) {
             this.running = running;
         }
 
+        private synchronized boolean getAndSetDataChanged(boolean newValue){
+
+            boolean oldVal = dataChanged;
+            dataChanged = newValue;
+            return oldVal;
+        }
 
         @Override
         public void run() {
@@ -368,9 +323,9 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                     continue;
                 }
 
-                boolean workDone = tileProvider.generateNextTile(state.visibleTileIdRange);
-                if(workDone){
-                    tileDataChanged.set(true);
+                boolean somethingGenerated = tileProvider.generateNextTile(state.visibleTileIdRange);
+                if(somethingGenerated){
+                    getAndSetDataChanged(true);
 
                     try{
 
@@ -394,7 +349,10 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         boolean running = false;
         boolean rerenderRequested = false;
 
-        private boolean visibleTileContentChanged, offsetChanged;
+        private boolean visibleTileChange, offsetChanged;
+
+        private Tile[][] visibleTiles;
+        private int[][] visibleTilesHistory;
 
         public TileGridDrawThread(SurfaceHolder holder) {
             this.holder = holder;
@@ -413,7 +371,9 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
             Canvas c;
 
-            int xCanvasOffset, xCanvasOffsetOld = 0, yCanvasOffset, yCanvasOffsetOld = 0;
+            TileRange tileRange;
+            int xCanvasOffset = 0, yCanvasOffset = 0;
+            int xCanvasOffsetOld = 0, yCanvasOffsetOld = 0;
 
             while (running) {
 
@@ -425,32 +385,27 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                 // the offsets may change _during these drawBlah() calls; Make a copy before
                 // rendering, otherwise there'll be flickering/tearing of tiles!
-                xCanvasOffset = state.scrollOffsetX % state.tileW;
-                yCanvasOffset = state.scrollOffsetY % state.tileW;
+                xCanvasOffset = state.xCanvasOffset;
+                yCanvasOffset = state.yCanvasOffset;
+                tileRange = state.visibleTileIdRange;
 
-                // in the case we're offset to the right, we need to start rendering 'back' a tile (the longer tile range
-                // handles the case of left offset)
-                if (xCanvasOffset > 0) {
-                    xCanvasOffset -= state.tileW;
-                }
-                if (yCanvasOffset > 0) {
-                    yCanvasOffset -= state.tileW;
-                }
-
-                // get changes in tile contents (if any) from the provider
-                if(tileMgmtThread!=null && tileMgmtThread.tileDataChanged.getAndSet(false)){ // unset as we check it
-                    visibleTileContentChanged = refreshTileGridFromProvider();
-                }
 
                 // and detect any change in offset
                 offsetChanged = xCanvasOffset != xCanvasOffsetOld || yCanvasOffset != yCanvasOffsetOld;
+
+                // get changes in tile contents (if any) from the provider
+                if((tileMgmtThread!=null && tileMgmtThread.getAndSetDataChanged(false)) || rerenderRequested || offsetChanged){
+                    Log.d(Utils.LOG_TAG, "Range="+ tileRange);
+                    visibleTileChange = getVisibleTileChanges(tileRange);
+                }
+
 
                 // update old values
                 xCanvasOffsetOld = xCanvasOffset;
                 yCanvasOffsetOld = yCanvasOffset;
 
 
-                if(visibleTileContentChanged || offsetChanged || rerenderRequested){
+                if(visibleTileChange || offsetChanged || rerenderRequested){
 
                     try {
 
@@ -460,7 +415,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                         }
 
                         synchronized (holder) {
-                            doDrawTiles(c, xCanvasOffset, yCanvasOffset);
+                            Log.w(Utils.LOG_TAG, String.format("visTileChng=%s, offsChng=%s, rendReq=%s",visibleTileChange, offsetChanged, rerenderRequested));
+                            doDrawTileGrid(c, xCanvasOffset, yCanvasOffset, tileRange);
                         }
                     }
                     finally {
@@ -474,7 +430,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                     // turn off flags that might not be set each iteration
                     rerenderRequested = false;
-                    visibleTileContentChanged = false;
+                    visibleTileChange = false;
 
                 }
 
@@ -491,104 +447,180 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         }
 
-    }
+        // return value indicates if there was a change in tile content requiring a redraw
+        private boolean getVisibleTileChanges(TileRange tileRange) {
+
+            if (tileRange == null) {
+                return false;
+            }
+
+            // only create the visibleTiles array when necessary
+            if(visibleTiles == null ||
+                    visibleTiles.length != state.tilesH || visibleTiles[0].length != state.tilesW){
+                visibleTiles = new Tile[state.tilesH][state.tilesW];
+
+                visibleTilesHistory = new int[state.tilesH][state.tilesW];
+
+            }
 
 
-    public void doDrawTiles(Canvas canvas, int xCanvasOffset, int yCanvasOffset) {
+            boolean renderRequired = false;
+            Tile tile_new;
 
-        canvas.save();
+            int top = tileRange.top;
+            int left = tileRange.left;
 
-        // blank out previous contents of screen
-        canvas.drawRect(0, 0, state.screenW, state.screenH, paint_bg);
+            int xId, yId;
 
-        if(state.visibleTiles != null) { // null if other thread has generated anything yet
+            for (int y = 0; y < state.tilesH; y++) {
 
-            // offset our canvas, so we can draw our whole tiles on with simple 0,0 origin co-ordinates
-            canvas.translate(xCanvasOffset, yCanvasOffset);
+                for (int x = 0; x < state.tilesW; x++) {
 
-            int curTileTop = 0;
-            Tile t;
+                    yId = y + top;
+                    xId = x + left;
 
-            for (int y=0; y< state.visibleTiles.length; y++) {
+                    tile_new = tileProvider.getTile(xId, yId);
 
-                Tile[] tileRow = state.visibleTiles[y];
+                    if (tile_new == null) {
 
-                int curTileLeft = 0;
+                        if(visibleTiles[y][x] != null){
+                            renderRequired = true; // wasn't null, now is!
+                        }
 
-                for (int x=0; x< tileRow.length; x++) {
+                        tile_new = new MissingTile(xId, yId); // always return a grid of non-null tiles
+                    }
+                    else{ // tile_new != null
 
-                    t = tileRow[x];
-
-                    Bitmap bmp = t.getBmpData();
-                    if (bmp != null) {
-
-                        canvas.drawBitmap(bmp, curTileLeft, curTileTop, null);
-
-                        if (debugEnabled) {
-                            canvas.drawRect(t.getRect(curTileLeft, curTileTop), paint_gridLine);
+                        if(visibleTiles[y][x] == null) {
+                            renderRequired = true; // was null, now isn't!
+                        }
+                        else{
+                            // old and new tiles were non-null
+                            if(visibleTilesHistory[y][x] != tile_new.getBmpHashcode()){
+                                renderRequired = true;
+                            }
                         }
 
                     }
+
+                    visibleTiles[y][x] = tile_new;
+                }
+
+            }
+
+
+
+            return renderRequired;
+
+        }
+
+        public void doDrawTileGrid(Canvas canvas, int xCanvasOffset, int yCanvasOffset, TileRange tileRange) {
+
+            canvas.save();
+
+            // blank out previous contents of screen
+            canvas.drawRect(0, 0, state.screenW, state.screenH, paint_bg);
+
+            if(visibleTiles != null) { // null if other thread has generated anything yet
+
+                Tile test = visibleTiles[0][0];
+
+                // this is just a sanity log message to help me debug
+                if(test.xId != tileRange.left){
+                Log.e(Utils.LOG_TAG,String.format("*** Rendering grid starting at [%2d,%2d] at offs x=%5d, range=%s",
+                        test.xId, test.yId, xCanvasOffset, tileRange));
+                }
+
+
+                // offset our canvas, so we can draw our whole tiles on with simple 0,0 origin co-ordinates
+                canvas.translate(xCanvasOffset, yCanvasOffset);
+
+                int curTileTop = 0;
+                Tile t;
+
+                for (int y=0; y< visibleTiles.length; y++) {
+
+                    Tile[] tileRow = visibleTiles[y];
+
+                    int curTileLeft = 0;
+
+                    for (int x=0; x< tileRow.length; x++) {
+
+                        t = tileRow[x];
+
+                        Bitmap bmp = t.getBmpData();
+                        if (bmp != null) {
+
+                            canvas.drawBitmap(bmp, curTileLeft, curTileTop, null);
+
+                            if (debugEnabled) {
+                                canvas.drawRect(t.getRect(curTileLeft, curTileTop), paint_gridLine);
+                            }
+
+                        }
 //                    else {
                         // TODO: null BMP - could allow provider to give us a 'no data' placeholder tile
 //                    }
 
-                    // remember what we drew in this cell
-                    state.visibleTilesHistory[y][x] = t.getBmpHashcode();
+                        // remember what we drew in this cell
+                        visibleTilesHistory[y][x] = t.getBmpHashcode();
 
-                    if (debugEnabled) {
+                        if (debugEnabled) {
 
-                        canvas.drawRect(t.getRect(curTileLeft, curTileTop), paint_gridLine);
+                            canvas.drawRect(t.getRect(curTileLeft, curTileTop), paint_gridLine);
 
-                        String msg1 = String.format("[%d,%d]", t.xId, t.yId);
-                        canvas.drawText(msg1, curTileLeft + (state.tileW / 2), curTileTop + (state.tileW / 2), paint_debugTileTxt);
+                            String msg1 = String.format("[%d,%d]", t.xId, t.yId);
+                            canvas.drawText(msg1, curTileLeft + (state.tileW / 2), curTileTop + (state.tileW / 2), paint_debugTileTxt);
+                        }
+
+                        curTileLeft += state.tileW; // move right one tile screenWidth
                     }
 
-                    curTileLeft += state.tileW; // move right one tile screenWidth
+                    curTileTop += state.tileW; // move down one tile screenWidth
                 }
 
-                curTileTop += state.tileW; // move down one tile screenWidth
+
+                // we don't want the debug box scrolling with the tiles, undo the offset
+                canvas.translate(-xCanvasOffset, -yCanvasOffset);
+
             }
 
+            if(debugEnabled){
+                // -------------------  debug box at bottom right ------------------------
 
-            // we don't want the debug box scrolling with the tiles, undo the offset
-            canvas.translate(-xCanvasOffset, -yCanvasOffset);
+                String fmt1 = "%dx%d, s=%1.3f";
+                String fmt2 = "offx=%d,y=%d, xm=%d, ym=%d";
+                String fmt3 = "tiles %s";
+                String msgResAndScale = String.format(fmt1, state.screenW, state.screenH, state.scaleFactor);
+                String msgOffset = String.format(fmt2, state.scrollOffsetX, state.scrollOffsetY, xCanvasOffset, yCanvasOffset);
+                String msgVisibleIds = String.format(fmt3, tileRange);
+                String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
+                //String msgMemory = Utils.getMemStatus();
+                //Paint paintMem = Utils.isHeapAlmostFull() ? paint_errText : paint_debugBoxTxt;
+
+                float boxWidth = 350, boxHeight = 145 - 35;
+
+                float debug_x = state.screenW - boxWidth;
+                float debug_y = state.screenH - boxHeight;
+
+                canvas.drawRect(debug_x, debug_y, state.screenW, state.screenH, paint_debugBG);
+
+                canvas.drawText(msgResAndScale, debug_x + boxWidth / 2, debug_y + 30, paint_debugBoxTxt);
+                canvas.drawText(msgOffset, debug_x + boxWidth / 2, debug_y + 55, paint_debugBoxTxt);
+                canvas.drawText(msgVisibleIds, debug_x + boxWidth / 2, debug_y + 80, paint_debugBoxTxt);
+                canvas.drawText(msgProvider, debug_x + boxWidth / 2, debug_y + 105, paint_debugBoxTxt);
+                //canvas.drawText(msgMemory, debug_x + boxWidth / 2, debug_y + 130, paintMem);
+            }
+
+            canvas.restore();
 
         }
 
-        if(debugEnabled){
-            // -------------------  debug box at bottom right ------------------------
-
-            String fmt1 = "%dx%d, s=%1.3f";
-            String fmt2 = "offx=%d,y=%d, xm=%d, ym=%d";
-            String fmt3 = "tiles %s";
-            String msgResAndScale = String.format(fmt1, state.screenW, state.screenH, state.scaleFactor);
-            String msgOffset = String.format(fmt2, state.scrollOffsetX, state.scrollOffsetY, xCanvasOffset, yCanvasOffset);
-            String msgVisibleIds = String.format(fmt3, state.visibleTileIdRange);
-            String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
-            //String msgMemory = Utils.getMemStatus();
-            //Paint paintMem = Utils.isHeapAlmostFull() ? paint_errText : paint_debugBoxTxt;
-
-            float boxWidth = 350, boxHeight = 145 - 35;
-
-            float debug_x = state.screenW - boxWidth;
-            float debug_y = state.screenH - boxHeight;
-
-            canvas.drawRect(debug_x, debug_y, state.screenW, state.screenH, paint_debugBG);
-
-            canvas.drawText(msgResAndScale, debug_x + boxWidth / 2, debug_y + 30, paint_debugBoxTxt);
-            canvas.drawText(msgOffset, debug_x + boxWidth / 2, debug_y + 55, paint_debugBoxTxt);
-            canvas.drawText(msgVisibleIds, debug_x + boxWidth / 2, debug_y + 80, paint_debugBoxTxt);
-            canvas.drawText(msgProvider, debug_x + boxWidth / 2, debug_y + 105, paint_debugBoxTxt);
-            //canvas.drawText(msgMemory, debug_x + boxWidth / 2, debug_y + 130, paintMem);
-        }
-
-        canvas.restore();
 
     }
 
 
-
+    //<editor-fold desc="secondary stuff">
     @Override // register GD
     public boolean onTouchEvent(MotionEvent me) {
 
@@ -608,13 +640,12 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         int tileW;
 
         int tilesW, tilesH;
-        Tile[][] visibleTiles;
-        int[][] visibleTilesHistory;
 
         // ScaleListener sets this from 0.1 to 5.0
         float scaleFactor = 1.0f;
 
-        int scrollOffsetX = 0, scrollOffsetY = 0;
+        int scrollOffsetX = 0, scrollOffsetY = 0, xCanvasOffset = 0, yCanvasOffset = 0;
+
 
         TileRange visibleTileIdRange;
 
@@ -693,6 +724,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         }
 
     }
+    //</editor-fold>
 
 
 }
