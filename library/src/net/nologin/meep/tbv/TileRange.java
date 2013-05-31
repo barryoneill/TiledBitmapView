@@ -1,12 +1,15 @@
 package net.nologin.meep.tbv;
 
 
+import android.util.Log;
+
 import java.lang.Math;
 import java.lang.String;
 
 public class TileRange {
 
-    public final int left, top, right, bottom;
+    // unfortunately, a mutable class (can be made immutable at the cost of excessive instantiation/GC)
+    public int left, top, right, bottom;
 
     public TileRange(int left, int top, int right, int bottom) {
         this.left = left;
@@ -19,6 +22,20 @@ public class TileRange {
 
         return t != null && contains(t.xId, t.yId);
 
+    }
+
+
+    public void copyValues(TileRange range){
+
+        if(range != null){
+            this.left = range.left;
+            this.right = range.right;
+            this.top = range.top;
+            this.bottom = range.bottom;
+        }
+        else{
+            Log.e(Utils.LOG_TAG, "Passed null tile to copyValues from");
+        }
     }
 
     public boolean contains(int x, int y) {

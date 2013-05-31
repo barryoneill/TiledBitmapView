@@ -26,6 +26,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     TileGridDrawThread tileDrawThread;
     TileManagementThread tileMgmtThread;
 
+    final ViewConfig config;
     final ViewState state;
 
     TileProvider tileProvider;
@@ -36,10 +37,10 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         super(context, attrs);
 
-        //noinspection ConstantConditions
-        getHolder().addCallback(this);
+        // noinspection ConstantConditions
+        getHolder().addCallback(this); // register as SurfaceHolder handler
 
-        // TODO: persist/restore during suitable lifecycle events
+        config = new ViewConfig();
         state = new ViewState();
 
         // background paint
@@ -50,8 +51,9 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         // background status text paint (needed?)
         paint_debugBoxTxt = new Paint();
         paint_debugBoxTxt.setColor(Color.WHITE);
-        paint_debugBoxTxt.setTextSize(20);
+        paint_debugBoxTxt.setTextSize(14);
         paint_debugBoxTxt.setAntiAlias(true);
+        paint_debugBoxTxt.setTypeface(Typeface.MONOSPACE);
         paint_debugBoxTxt.setTextAlign(Paint.Align.CENTER);
 
         paint_debugTileTxt = new Paint(paint_debugBoxTxt);
@@ -100,7 +102,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     public boolean toggleDebugEnabled() {
         debugEnabled = !debugEnabled;
 
-        if(tileDrawThread != null){
+        if (tileDrawThread != null) {
             tileDrawThread.requestRerender();
         }
 
@@ -154,13 +156,13 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
 
-        state.screenW = width;
-        state.screenH = height;
+        config.screenW = width;
+        config.screenH = height;
 
-        state.tileW = tileProvider.getTileWidthPixels();
+        config.tileWidth = tileProvider.getTileWidthPixels();
 
-        state.tilesW = maxTilesNeeded(width, state.tileW);
-        state.tilesH = maxTilesNeeded(height, state.tileW);
+        config.tilesHoriz = maxTilesNeeded(width, config.tileWidth);
+        config.tilesVert = maxTilesNeeded(height, config.tileWidth);
 
         jumpToOriginTile();
     }
@@ -184,7 +186,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         jumpToTile(0, 0);
 
-        if(tileDrawThread != null){
+        if (tileDrawThread != null) {
             tileDrawThread.requestRerender();
         }
 
@@ -197,17 +199,17 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             return;
         }
 
-        if (state.screenW == 0) {
+        if (config.screenW == 0) {
             Log.d(Utils.LOG_TAG, "Surface not ready yet, cannot go to tile");
             return;
         }
 
         GridAnchor anchor = tileProvider.getGridAnchor();
 
-        Pair<Integer, Integer> originOffset = anchor.getOriginOffset(state.screenW, state.screenH, state.tileW);
+        Pair<Integer, Integer> originOffset = anchor.getOriginOffset(config.screenW, config.screenH, config.tileWidth);
 
-        int newOffX = originOffset.first - (state.tileW * x);
-        int newOffY = originOffset.second - (state.tileW * y);
+        int newOffX = originOffset.first - (config.tileWidth * x);
+        int newOffY = originOffset.second - (config.tileWidth * y);
 
         validateAndApplyOffset(newOffX, newOffY);
 
@@ -216,8 +218,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     private void validateAndApplyOffset(int newOffX, int newOffY) {
 
-        Pair<Integer, Integer> range_horiz = getTileRangeForOffset(newOffX, state.tilesW, state.tileW);
-        Pair<Integer, Integer> range_vert = getTileRangeForOffset(newOffY, state.tilesH, state.tileW);
+        Pair<Integer, Integer> range_horiz = getTileRangeForOffset(newOffX, config.tilesHoriz, config.tileWidth);
+        Pair<Integer, Integer> range_vert = getTileRangeForOffset(newOffY, config.tilesVert, config.tileWidth);
 
         Integer[] bounds = tileProvider.getTileIndexBounds();
         if (bounds != null && bounds.length != 4) {
@@ -225,6 +227,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                     + " elements, must be 4 - Ignoring.");
             bounds = null;
         }
+
 
         if (bounds != null && state.visibleTileIdRange != null) {
 
@@ -252,17 +255,26 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         state.scrollOffsetX = newOffX;
         state.scrollOffsetY = newOffY;
 
-        state.xCanvasOffset = state.scrollOffsetX % state.tileW;
-        state.yCanvasOffset = state.scrollOffsetY % state.tileW;
+        state.xCanvasOffset = state.scrollOffsetX % config.tileWidth;
+        state.yCanvasOffset = state.scrollOffsetY % config.tileWidth;
+
+        Log.d(Utils.LOG_TAG, String.format("state.xCanvasOffset(%d) = state.scrollOffsetX(%d) mod config.tileW(%d)",
+                state.xCanvasOffset, state.scrollOffsetX, config.tileWidth ));
 
         // in the case we're offset to the right, we need to start rendering 'back' a tile (the longer tile range
         // handles the case of left offset)
         if (state.xCanvasOffset > 0) {
-            state.xCanvasOffset -= state.tileW;
+            state.xCanvasOffset -= config.tileWidth;
         }
         if (state.yCanvasOffset > 0) {
-            state.yCanvasOffset -= state.tileW;
+            state.yCanvasOffset -= config.tileWidth;
         }
+
+
+
+            //Log.w(Utils.LOG_TAG, "===== - OFFS now " + state.xCanvasOffset );
+
+
 
         // call notify only on range change
         if (state.visibleTileIdRange == null || !newRange.equals(state.visibleTileIdRange)) {
@@ -287,7 +299,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     private class MissingTile extends Tile {
         public MissingTile(int x, int y) {
-            super(x, y, state.tileW);
+            super(x, y, config.tileWidth);
         }
     }
 
@@ -307,7 +319,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             this.running = running;
         }
 
-        private synchronized boolean getAndSetDataChanged(boolean newValue){
+        private synchronized boolean getAndSetDataChanged(boolean newValue) {
 
             boolean oldVal = dataChanged;
             dataChanged = newValue;
@@ -319,21 +331,21 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
             while (running) {
 
-                if (tileProvider == null) {
+                if (tileProvider == null || state.visibleTileIdRange == null) {
                     continue;
                 }
 
                 boolean somethingGenerated = tileProvider.generateNextTile(state.visibleTileIdRange);
-                if(somethingGenerated){
+                if (somethingGenerated) {
                     getAndSetDataChanged(true);
 
-                    try{
+                    try {
 
                         /* back off a bit if there was nothing done. Perhaps this needs to be slightly less
                          * dumb, eg, sleep only after 5 successive empty calls. Or perhaps not needed at all.. */
                         Thread.sleep(20);
+                    } catch (InterruptedException ignored) {
                     }
-                    catch(InterruptedException ignored){}
                 }
 
             }
@@ -362,7 +374,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             this.running = running;
         }
 
-        public void requestRerender(){
+        public void requestRerender() {
             this.rerenderRequested = true;
         }
 
@@ -371,13 +383,13 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
             Canvas c;
 
-            TileRange tileRange;
-            int xCanvasOffset = 0, yCanvasOffset = 0;
+            TileRange visibleRange = new TileRange(0,0,0,0);
+            int xCanvasOffset, yCanvasOffset;
             int xCanvasOffsetOld = 0, yCanvasOffsetOld = 0;
 
             while (running) {
 
-                if (state.tileW <= 0) {
+                if (config.tileWidth <= 0 || state.visibleTileIdRange == null) {
                     continue; // sanity check - surfaceChanged() work not called/finished yet
                 }
 
@@ -387,25 +399,26 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 // rendering, otherwise there'll be flickering/tearing of tiles!
                 xCanvasOffset = state.xCanvasOffset;
                 yCanvasOffset = state.yCanvasOffset;
-                tileRange = state.visibleTileIdRange;
-
+                visibleRange.copyValues(state.visibleTileIdRange);
 
                 // and detect any change in offset
                 offsetChanged = xCanvasOffset != xCanvasOffsetOld || yCanvasOffset != yCanvasOffsetOld;
 
-                // get changes in tile contents (if any) from the provider
-                if((tileMgmtThread!=null && tileMgmtThread.getAndSetDataChanged(false)) || rerenderRequested || offsetChanged){
-                    Log.d(Utils.LOG_TAG, "Range="+ tileRange);
-                    visibleTileChange = getVisibleTileChanges(tileRange);
+                if (Math.abs(xCanvasOffsetOld - xCanvasOffset) > 20) {
+                    Log.wtf(Utils.LOG_TAG, "##### - Jump from " + xCanvasOffsetOld + " to " + xCanvasOffset);
                 }
-
 
                 // update old values
                 xCanvasOffsetOld = xCanvasOffset;
                 yCanvasOffsetOld = yCanvasOffset;
 
 
-                if(visibleTileChange || offsetChanged || rerenderRequested){
+                // get changes in tile contents (if any) from the provider
+                if ((tileMgmtThread != null && tileMgmtThread.getAndSetDataChanged(false)) || rerenderRequested || offsetChanged) {
+                    visibleTileChange = getVisibleTileChanges(visibleRange);
+                }
+
+                if (visibleTileChange || offsetChanged || rerenderRequested) {
 
                     try {
 
@@ -415,11 +428,10 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                         }
 
                         synchronized (holder) {
-                            Log.w(Utils.LOG_TAG, String.format("visTileChng=%s, offsChng=%s, rendReq=%s",visibleTileChange, offsetChanged, rerenderRequested));
-                            doDrawTileGrid(c, xCanvasOffset, yCanvasOffset, tileRange);
+                            //Log.w(Utils.LOG_TAG, String.format("visTileChng=%s, offsChng=%s, rendReq=%s",visibleTileChange, offsetChanged, rerenderRequested));
+                            doDrawTileGrid(c, state.xCanvasOffset, yCanvasOffset, visibleRange);
                         }
-                    }
-                    finally {
+                    } finally {
                         // do this in a finally so that if an exception is thrown
                         // during the above, we don't leave the Surface in an
                         // inconsistent state
@@ -435,7 +447,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 }
 
 
-
                 // NB: do not sleep while the canvas is locked
 //                try{
 //                    Thread.sleep(5);
@@ -448,18 +459,14 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         }
 
         // return value indicates if there was a change in tile content requiring a redraw
-        private boolean getVisibleTileChanges(TileRange tileRange) {
-
-            if (tileRange == null) {
-                return false;
-            }
+        private boolean getVisibleTileChanges(TileRange visibleRange) {
 
             // only create the visibleTiles array when necessary
-            if(visibleTiles == null ||
-                    visibleTiles.length != state.tilesH || visibleTiles[0].length != state.tilesW){
-                visibleTiles = new Tile[state.tilesH][state.tilesW];
+            if (visibleTiles == null ||
+                    visibleTiles.length != config.tileWidth || visibleTiles[0].length != config.tileWidth) {
+                visibleTiles = new Tile[config.tilesVert][config.tilesHoriz];
 
-                visibleTilesHistory = new int[state.tilesH][state.tilesW];
+                visibleTilesHistory = new int[config.tilesVert][config.tilesHoriz];
 
             }
 
@@ -467,36 +474,31 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             boolean renderRequired = false;
             Tile tile_new;
 
-            int top = tileRange.top;
-            int left = tileRange.left;
-
             int xId, yId;
 
-            for (int y = 0; y < state.tilesH; y++) {
+            for (int y = 0; y < config.tilesVert; y++) {
 
-                for (int x = 0; x < state.tilesW; x++) {
+                for (int x = 0; x < config.tilesHoriz; x++) {
 
-                    yId = y + top;
-                    xId = x + left;
+                    yId = y + visibleRange.top;
+                    xId = x + visibleRange.left;
 
                     tile_new = tileProvider.getTile(xId, yId);
 
                     if (tile_new == null) {
 
-                        if(visibleTiles[y][x] != null){
+                        if (visibleTiles[y][x] != null) {
                             renderRequired = true; // wasn't null, now is!
                         }
 
                         tile_new = new MissingTile(xId, yId); // always return a grid of non-null tiles
-                    }
-                    else{ // tile_new != null
+                    } else { // tile_new != null
 
-                        if(visibleTiles[y][x] == null) {
+                        if (visibleTiles[y][x] == null) {
                             renderRequired = true; // was null, now isn't!
-                        }
-                        else{
+                        } else {
                             // old and new tiles were non-null
-                            if(visibleTilesHistory[y][x] != tile_new.getBmpHashcode()){
+                            if (visibleTilesHistory[y][x] != tile_new.getBmpHashcode()) {
                                 renderRequired = true;
                             }
                         }
@@ -509,7 +511,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             }
 
 
-
             return renderRequired;
 
         }
@@ -519,17 +520,11 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             canvas.save();
 
             // blank out previous contents of screen
-            canvas.drawRect(0, 0, state.screenW, state.screenH, paint_bg);
+            canvas.drawRect(0, 0, config.screenW, config.screenH, paint_bg);
 
-            if(visibleTiles != null) { // null if other thread has generated anything yet
+            if (visibleTiles != null) { // null if other thread has generated anything yet
 
-                Tile test = visibleTiles[0][0];
-
-                // this is just a sanity log message to help me debug
-                if(test.xId != tileRange.left){
-                Log.e(Utils.LOG_TAG,String.format("*** Rendering grid starting at [%2d,%2d] at offs x=%5d, range=%s",
-                        test.xId, test.yId, xCanvasOffset, tileRange));
-                }
+                //Log.e(Utils.LOG_TAG, String.format("X=%6d,CX=%5d,CXS=%5d,R=%s", state.scrollOffsetX, xCanvasOffset, state.xCanvasOffset, tileRange));
 
 
                 // offset our canvas, so we can draw our whole tiles on with simple 0,0 origin co-ordinates
@@ -538,13 +533,13 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 int curTileTop = 0;
                 Tile t;
 
-                for (int y=0; y< visibleTiles.length; y++) {
+                for (int y = 0; y < visibleTiles.length; y++) {
 
                     Tile[] tileRow = visibleTiles[y];
 
                     int curTileLeft = 0;
 
-                    for (int x=0; x< tileRow.length; x++) {
+                    for (int x = 0; x < tileRow.length; x++) {
 
                         t = tileRow[x];
 
@@ -570,13 +565,14 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                             canvas.drawRect(t.getRect(curTileLeft, curTileTop), paint_gridLine);
 
                             String msg1 = String.format("[%d,%d]", t.xId, t.yId);
-                            canvas.drawText(msg1, curTileLeft + (state.tileW / 2), curTileTop + (state.tileW / 2), paint_debugTileTxt);
+                            canvas.drawText(msg1, curTileLeft + (config.tileWidth / 2),
+                                    curTileTop + (config.tileWidth / 2), paint_debugTileTxt);
                         }
 
-                        curTileLeft += state.tileW; // move right one tile screenWidth
+                        curTileLeft += config.tileWidth; // move right one tile screenWidth
                     }
 
-                    curTileTop += state.tileW; // move down one tile screenWidth
+                    curTileTop += config.tileWidth; // move down one tile screenWidth
                 }
 
 
@@ -585,25 +581,24 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
             }
 
-            if(debugEnabled){
+            if (debugEnabled) {
                 // -------------------  debug box at bottom right ------------------------
 
                 String fmt1 = "%dx%d, s=%1.3f";
-                String fmt2 = "offx=%d,y=%d, xm=%d, ym=%d";
-                String fmt3 = "tiles %s";
-                String msgResAndScale = String.format(fmt1, state.screenW, state.screenH, state.scaleFactor);
+                String fmt2 = "x=%5d,y=%5d, cx=%4d,cy=%4d";
+                String msgResAndScale = String.format(fmt1, config.screenW, config.screenH, state.scaleFactor);
                 String msgOffset = String.format(fmt2, state.scrollOffsetX, state.scrollOffsetY, xCanvasOffset, yCanvasOffset);
-                String msgVisibleIds = String.format(fmt3, tileRange);
+                String msgVisibleIds = tileRange.toString();
                 String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
                 //String msgMemory = Utils.getMemStatus();
                 //Paint paintMem = Utils.isHeapAlmostFull() ? paint_errText : paint_debugBoxTxt;
 
                 float boxWidth = 350, boxHeight = 145 - 35;
 
-                float debug_x = state.screenW - boxWidth;
-                float debug_y = state.screenH - boxHeight;
+                float debug_x = config.screenW - boxWidth;
+                float debug_y = config.screenH - boxHeight;
 
-                canvas.drawRect(debug_x, debug_y, state.screenW, state.screenH, paint_debugBG);
+                canvas.drawRect(debug_x, debug_y, config.screenW, config.screenH, paint_debugBG);
 
                 canvas.drawText(msgResAndScale, debug_x + boxWidth / 2, debug_y + 30, paint_debugBoxTxt);
                 canvas.drawText(msgOffset, debug_x + boxWidth / 2, debug_y + 55, paint_debugBoxTxt);
@@ -633,24 +628,30 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     }
 
 
-    static class ViewState {
+    static class ViewConfig {
 
         int screenW, screenH;
 
-        int tileW;
+        int tileWidth;
 
-        int tilesW, tilesH;
+        int tilesHoriz, tilesVert;
+
+    }
+
+    static class ViewState {
+
+        private int scrollOffsetX = 0, scrollOffsetY = 0, xCanvasOffset = 0, yCanvasOffset = 0;
+
+        private TileRange visibleTileIdRange;
 
         // ScaleListener sets this from 0.1 to 5.0
         float scaleFactor = 1.0f;
 
-        int scrollOffsetX = 0, scrollOffsetY = 0, xCanvasOffset = 0, yCanvasOffset = 0;
-
-
-        TileRange visibleTileIdRange;
-
 
     }
+
+
+
 
     // http://android-developers.blogspot.com/2010/06/making-sense-of-multitouch.html
     class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
@@ -664,6 +665,10 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
             // let the provider know something has changed
             tileProvider.notifyZoomFactorChange(state.scaleFactor);
+
+            if(tileDrawThread != null){
+                tileDrawThread.requestRerender();
+            }
 
             return true;
         }
@@ -720,7 +725,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
             Log.d(Utils.LOG_TAG, "single tap");
 
-            return false;
+            return true;
         }
 
     }
