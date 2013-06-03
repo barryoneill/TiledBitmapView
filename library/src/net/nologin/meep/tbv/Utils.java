@@ -1,10 +1,6 @@
 package net.nologin.meep.tbv;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Debug;
-import android.preference.PreferenceManager;
-import android.util.Log;
 
 import java.text.DecimalFormat;
 

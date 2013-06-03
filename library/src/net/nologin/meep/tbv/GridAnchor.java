@@ -15,34 +15,34 @@ public enum GridAnchor {
     SW, S, SE;
 
 
-    final Pair<Integer,Integer> getOriginOffset(int width, int height, int tilew) {
+    final Pair<Integer,Integer> getOriginCoords(int width, int height, int tilew) {
 
         // default to 0,0 (covers left hand side and across top)
-        int offX=0, offY=0;
+        int x=0, y=0;
 
         // anchors vertical through the middle
         if(N == this || CENTER == this || S == this){
-            offX = (width - tilew)/2;
+            x = (width - tilew)/2;
         }
 
         // anchors down the right hand side
         if(NE == this || E == this || SE == this){
-            offX = width - tilew;
+            x = width - tilew;
         }
 
         // anchors horizontal through the middle
         if(W == this || CENTER == this || E == this){
-            offY = (height - tilew)/2;
+            y = (height - tilew)/2;
         }
 
         // anchors along the bottom
         if(SW == this || S == this || SE == this) {
-            offY = height - tilew;
+            y = height - tilew;
         }
 
         // Aside: debate on '==' vs equals for enums at the following page:
         // http://stackoverflow.com/questions/1750435/comparing-java-enum-members-or-equals
 
-        return new Pair<Integer, Integer>(offX,offY);
+        return new Pair<Integer, Integer>(x,y);
     }
 }
