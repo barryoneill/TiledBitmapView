@@ -13,7 +13,7 @@ public interface TileProvider {
     /**
      * Get the specified tile.  This should be _fast_, otherwise it will slow down the rendering rate.  If it takes
      * time to render tiles, consider using a queueing system. Return null for now (results in an empty square rendered
-     * for that particular frame), and let the asynchronous calls to {@link TileProvider#generateNextTile(TileRange)}
+     * for that particular frame), and let the asynchronous calls to {@link TileProvider#processQueue(TileRange)}
      * give you a chance to process the tiles.
      * @param x The x-attribute of the id
      * @param y The y-attribute of the id
@@ -30,7 +30,7 @@ public interface TileProvider {
      * @return true to indicate processing took place during this call, false if no work needed doing.  This does not
      * guarantee any behaviour by the view, but may be used as a performance hueristic.
      */
-    public boolean generateNextTile(TileRange visible);
+    public boolean processQueue(TileRange visible);
 
     /**
      * Allows the provider to specify tile ID boundaries. If specified, scrolling past that tile ID will be prohibited.
@@ -74,6 +74,17 @@ public interface TileProvider {
      */
     public GridAnchor getGridAnchor();
 
+
+    /**
+     * By default the tile grid size is the minimum needed to cover rendering the view area.  This is good
+     * for minimizing the number of calls for tile fetching, but leads to a poorer experience when scrolling (newly
+     * displayed area is empty for a brief moment while fetching).  Use this value to increase the grid size to
+     * include a 'buffer' of off-screen tiles, which leads to a better scrolling experience.  Keep in mind that a
+     * larger grid size means more fetching/processing.
+     *
+     * @return The 'buffer tile' size. Eg, setting this to one would increase a grid of 6x4 tiles to a 7x5 grid.
+     */
+    public int getGridBufferSize();
 
 
 }

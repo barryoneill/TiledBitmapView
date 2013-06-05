@@ -49,10 +49,15 @@ public class DemoTileProvider implements TileProvider {
     }
 
     @Override
+    public int getGridBufferSize() {
+        return 2;
+    }
+
+    @Override
     public Tile getTile(int x, int y) {
 
         /* don't render the tile here, that could hold up the UI.  The call to notifyTileIDRangeChange() will
-         * let us add the required tiles to a queue that we can render in the bg in generateNextTile(). */
+         * let us add the required tiles to a queue that we can render in the bg in processQueue(). */
         return tileCache.get(Tile.getCacheKey(x,y));
 
     }
@@ -63,7 +68,7 @@ public class DemoTileProvider implements TileProvider {
     }
 
     @Override
-    public boolean generateNextTile(TileRange visible) {
+    public boolean processQueue(TileRange visible) {
 
         DemoTile t;
 

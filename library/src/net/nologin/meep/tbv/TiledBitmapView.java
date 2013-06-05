@@ -7,6 +7,7 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Pair;
+import android.os.Process;
 import android.view.*;
 
 @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
@@ -152,11 +153,11 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
 
-        state = new ViewState(width,height,tileProvider.getTileWidthPixels(), tileProvider.getTileIndexBounds());
+        state = new ViewState(width,height,tileProvider.getTileWidthPixels(),
+                tileProvider.getTileIndexBounds(), tileProvider.getGridBufferSize());
 
         jumpToOriginTile();
     }
-
 
 
     public void jumpToOriginTile() {
@@ -217,6 +218,11 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         TileRange range = null;
 
+        public TileManagementThread(){
+
+
+        }
+
         public void setRunning(boolean running) {
             this.running = running;
         }
@@ -231,6 +237,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         @Override
         public void run() {
 
+
+
             while (running) {
 
                 if (tileProvider == null || state == null) {
@@ -243,7 +251,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 }
 
 
-                boolean somethingGenerated = tileProvider.generateNextTile(range);
+                boolean somethingGenerated = tileProvider.processQueue(range);
                 if (somethingGenerated) {
                     getAndSetDataChanged(true);
 
@@ -251,7 +259,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                         /* back off a bit if there was nothing done. Perhaps this needs to be slightly less
                          * dumb, eg, sleep only after 5 successive empty calls. Or perhaps not needed at all.. */
-                        Thread.sleep(500);
+                        Thread.sleep(20);
                     } catch (InterruptedException ignored) {
                     }
                 }
@@ -291,11 +299,18 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         @Override
         public void run() {
 
+            // this should have a ever so slightly better prio than the tile generation thread
+            Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
+
             Canvas c;
 
             int xCanvasOffsetOld = 0, yCanvasOffsetOld = 0;
 
             while (running) {
+
+                if(state == null){
+                    continue;
+                }
 
                 snapshot = state.updateRenderSnapshot();
 
