@@ -124,7 +124,8 @@ public class DemoTileProvider implements TileProvider {
     @Override
     public Integer[] getTileIndexBounds(){
 
-        return null; // no limit to scrolling
+        //return null; // no limit to scrolling
+        return new Integer[]{-8,-8,-8,-8};
 
     }
 

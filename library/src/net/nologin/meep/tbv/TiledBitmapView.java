@@ -4,6 +4,8 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.*;
 import android.os.Build;
+import android.os.Bundle;
+import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Pair;
@@ -12,6 +14,9 @@ import android.view.*;
 
 @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
 public abstract class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callback {
+
+    private static final String STATEKEY_SUPERCLASS = "net.nologin.meep.tbv.super";
+    private static final String STATEKEY_DEBUG_ENABLED = "net.nologin.meep.tbv.debugenabled";
 
     //<editor-fold desc="setup stuff">
     final GestureDetector gestureDetector;
@@ -31,7 +36,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     TileProvider tileProvider;
 
-    protected boolean debugEnabled;
+    private boolean debugEnabled;
 
     public TiledBitmapView(Context context, AttributeSet attrs) {
 
@@ -75,9 +80,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         gestureDetector = new GestureDetector(context, new GestureListener());
         scaleDetector = new ScaleGestureDetector(context, new ScaleListener());
 
-
-        debugEnabled = true; // TODO: Utils.Prefs.getPrefDebugEnabled(context);
-
     }
 
     protected void setTileProvider(TileProvider tileProvider) {
@@ -86,10 +88,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
     protected TileProvider getTileProvider() {
         return this.tileProvider;
-    }
-
-    public void setDebugEnabled(boolean debugEnabled) {
-        this.debugEnabled = debugEnabled;
     }
 
     public boolean isDebugEnabled() {
@@ -105,6 +103,30 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         return debugEnabled;
     }
+
+    @Override
+    public Parcelable onSaveInstanceState() {
+
+        Bundle bundle = new Bundle();
+        bundle.putParcelable(STATEKEY_SUPERCLASS, super.onSaveInstanceState());
+        bundle.putBoolean(STATEKEY_DEBUG_ENABLED, debugEnabled);
+
+        return bundle;
+    }
+
+    @Override
+    public void onRestoreInstanceState(Parcelable state) {
+
+        if (state instanceof Bundle) {
+            Bundle bundle = (Bundle) state;
+            this.debugEnabled = bundle.getBoolean(STATEKEY_DEBUG_ENABLED);
+            super.onRestoreInstanceState(bundle.getParcelable(STATEKEY_SUPERCLASS));
+            return;
+        }
+
+        super.onRestoreInstanceState(state);
+    }
+
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
@@ -320,16 +342,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                 c = null;
 
-                //  TODO: docthe offsets may change _during these drawBlah() calls; Make a copy before
-                // rendering, otherwise there'll be flickering/tearing of tiles!
-
-
                 // and detect any change in offset
                 offsetChanged = snapshot.xCanvasOffset != xCanvasOffsetOld || snapshot.yCanvasOffset != yCanvasOffsetOld;
-
-//                if (Math.abs(xCanvasOffsetOld - copyXCanvasOffset) > 20) {
-//                    Log.wtf(Utils.LOG_TAG, "##### - Jump from " + xCanvasOffsetOld + " to " + copyXCanvasOffset);
-//                }
 
                 // update old values
                 xCanvasOffsetOld = snapshot.xCanvasOffset;
@@ -476,9 +490,9 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                             }
 
                         }
-//                    else {
-                        // TODO: null BMP - could allow provider to give us a 'no data' placeholder tile
-//                    }
+                        // else {
+                        //     could possibly let providers give us a 'no data' tile in the future.  For now, ignore.
+                        // }
 
                         // remember what we drew in this cell
                         visibleTilesHistory[y][x] = t.getBmpHashcode();
@@ -513,21 +527,22 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 String msgOffset = String.format(fmt2, snapshot.xCoordinate, snapshot.yCoordinate, snapshot.xCanvasOffset, snapshot.yCanvasOffset);
                 String msgVisibleIds = snapshot.visibleTileIdRange.toString();
                 String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
-                //String msgMemory = Utils.getMemStatus();
-                //Paint paintMem = Utils.isHeapAlmostFull() ? paint_errText : paint_debugBoxTxt;
+                String msgMemory = Utils.getMemStatus();
+                Paint paintMem = Utils.isHeapAlmostFull() ? paint_errText : paint_debugBoxTxt;
 
-                float boxWidth = 350, boxHeight = 145 - 35;
+                float boxWidth = 350, boxHeight = 110;
 
-                float debug_x = state.screenW - boxWidth;
-                float debug_y = state.screenH - boxHeight;
+                float boxLeft = state.screenW - boxWidth;
+                float boxTop = state.screenH - boxHeight;
+                float boxMid = boxLeft + boxWidth/2;
 
-                canvas.drawRect(debug_x, debug_y, state.screenW, state.screenH, paint_debugBG);
+                canvas.drawRect(boxLeft, boxTop, state.screenW, state.screenH, paint_debugBG);
 
-                canvas.drawText(msgResAndScale, debug_x + boxWidth / 2, debug_y + 30, paint_debugBoxTxt);
-                canvas.drawText(msgOffset, debug_x + boxWidth / 2, debug_y + 55, paint_debugBoxTxt);
-                canvas.drawText(msgVisibleIds, debug_x + boxWidth / 2, debug_y + 80, paint_debugBoxTxt);
-                canvas.drawText(msgProvider, debug_x + boxWidth / 2, debug_y + 105, paint_debugBoxTxt);
-                //canvas.drawText(msgMemory, debug_x + boxWidth / 2, debug_y + 130, paintMem);
+                canvas.drawText(msgResAndScale, boxMid, boxTop + 20, paint_debugBoxTxt);
+                canvas.drawText(msgOffset, boxMid, boxTop + 40, paint_debugBoxTxt);
+                canvas.drawText(msgVisibleIds, boxMid, boxTop + 60, paint_debugBoxTxt);
+                canvas.drawText(msgProvider, boxMid, boxTop + 80, paint_debugBoxTxt);
+                canvas.drawText(msgMemory, boxMid, boxTop + 100, paintMem);
             }
 
             canvas.restore();

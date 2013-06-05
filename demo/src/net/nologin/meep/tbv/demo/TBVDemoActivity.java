@@ -31,6 +31,7 @@ public class TBVDemoActivity extends Activity {
         });
 
 
+        btnToggleDebug.setChecked(stv.isDebugEnabled());
         btnToggleDebug.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -38,9 +39,8 @@ public class TBVDemoActivity extends Activity {
             }
         });
 
-        // default to on, TODO: impl view state saving in DemoTileView
-        btnToggleDebug.setChecked(true);
-        stv.setDebugEnabled(true);
+
+
 
     }
 
