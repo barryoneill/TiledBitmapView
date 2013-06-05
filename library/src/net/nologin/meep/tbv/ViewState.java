@@ -5,10 +5,16 @@ import android.annotation.TargetApi;
 import android.os.Build;
 import android.util.Log;
 import android.util.Pair;
-import android.widget.Toast;
 
 /**
- * TODO: document this well
+ * Represents the state of the tiles to be rendered in the TileBitmapView.
+ *
+ * TiledBitmapView maintains an instance of this class, and updates the content on lifecycle and
+ * user interaction events (Eg, start, scroll etc).  The state contained in this mutable class should
+ * be stored and read in a thread-safe atomic manner.  This means the rendering thread should take
+ * snapshots of the 'state' that it needs to render in a synchronized manner, as the the UI thread
+ * may have since updated the state.
+ *
  */
 @TargetApi(Build.VERSION_CODES.ECLAIR)
 public final class ViewState {
@@ -76,12 +82,12 @@ public final class ViewState {
         return visibleTileIdRange;
     }
 
-    public synchronized TileRange goToCoordinatesOffset(int newOffX, int newOffY) {
+    public synchronized TileRange goToCoordinatesOffset(int newOffX, int newOffY, boolean alwaysReturnRange) {
 
-        return goToCoordinates(xCoordinate + newOffX, yCoordinate + newOffY);
+        return goToCoordinates(xCoordinate + newOffX, yCoordinate + newOffY, alwaysReturnRange);
     }
 
-    public synchronized TileRange goToCoordinates(int newXCoord, int newYCoord) {
+    public synchronized TileRange goToCoordinates(int newXCoord, int newYCoord, boolean alwaysReturnRange) {
 
         Pair<Integer, Integer> range_horiz = calculateTileIDRange(newXCoord, tilesHoriz);
         Pair<Integer, Integer> range_vert = calculateTileIDRange(newYCoord, tilesVert);
@@ -136,7 +142,7 @@ public final class ViewState {
             visibleTileIdRange = newRange;
             return newRange;
         } else {
-            return null; // signal that no change in range occured
+            return alwaysReturnRange ? newRange : null; // signal that no change in range occured
         }
 
     }

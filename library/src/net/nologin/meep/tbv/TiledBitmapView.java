@@ -12,6 +12,8 @@ import android.util.Pair;
 import android.os.Process;
 import android.view.*;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @TargetApi(Build.VERSION_CODES.GINGERBREAD_MR1)
 public abstract class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callback {
 
@@ -185,21 +187,20 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         state = new ViewState(width,height,tileProvider.getTileWidthPixels(),
                 tileProvider.getTileIndexBounds(), tileProvider.getGridBufferSize());
 
-        jumpToOriginTile();
+        jumpToOriginTile(true);
     }
-
 
     public void jumpToOriginTile() {
+        jumpToOriginTile(false);
+    }
 
-        jumpToTile(0, 0);
+    public void jumpToOriginTile(boolean alwaysNotifyProvider) {
 
-        if (tileDrawThread != null) {
-            tileDrawThread.requestRerender();
-        }
+        jumpToTile(0, 0, alwaysNotifyProvider);
 
     }
 
-    public void jumpToTile(int x, int y) {
+    public void jumpToTile(int x, int y, boolean alwaysNotifyProvider) {
 
         if (tileProvider == null) {
             Log.d(Utils.LOG_TAG, "Provider not ready yet, cannot go to tile");
@@ -218,9 +219,13 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         int newX = originCoords.first - (state.tileWidth * x);
         int newY = originCoords.second - (state.tileWidth * y);
 
-        TileRange updatedRange = state.goToCoordinates(newX, newY);
+        TileRange updatedRange = state.goToCoordinates(newX, newY, alwaysNotifyProvider);
         if(updatedRange != null){
             tileProvider.notifyTileIDRangeChange(updatedRange);
+        }
+
+        if (tileDrawThread != null) {
+            tileDrawThread.requestRerender();
         }
 
     }
@@ -243,7 +248,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         private boolean running = false;
 
-        private boolean dataChanged = true;
+        private AtomicBoolean dataChanged = new AtomicBoolean(true);
 
         TileRange range = null;
 
@@ -254,13 +259,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         public void setRunning(boolean running) {
             this.running = running;
-        }
-
-        private synchronized boolean getAndSetDataChanged(boolean newValue) {
-
-            boolean oldVal = dataChanged;
-            dataChanged = newValue;
-            return oldVal;
         }
 
         @Override
@@ -282,7 +280,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
                 boolean somethingGenerated = tileProvider.processQueue(range);
                 if (somethingGenerated) {
-                    getAndSetDataChanged(true);
+                    dataChanged.set(true);
 
                     try {
 
@@ -304,7 +302,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
 
         private final SurfaceHolder holder;
         boolean running = false;
-        boolean rerenderRequested = false;
+        private AtomicBoolean rerenderRequested = new AtomicBoolean(false);
 
         private boolean visibleTileChange, offsetChanged;
 
@@ -322,7 +320,8 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         }
 
         public void requestRerender() {
-            this.rerenderRequested = true;
+            rerenderRequested.set(true);
+            Log.d(Utils.LOG_TAG,"setting rerender to true");
         }
 
         @Override
@@ -334,6 +333,9 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             Canvas c;
 
             int xCanvasOffsetOld = 0, yCanvasOffsetOld = 0;
+
+            boolean providerDataChangeCpy, rerenderRequestedCpy;
+
 
             while (running) {
 
@@ -356,13 +358,16 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                 xCanvasOffsetOld = snapshot.xCanvasOffset;
                 yCanvasOffsetOld = snapshot.yCanvasOffset;
 
+                // get and set both to false
+                providerDataChangeCpy = tileMgmtThread.dataChanged.getAndSet(false);
+                rerenderRequestedCpy = rerenderRequested.getAndSet(false);
 
                 // get changes in tile contents (if any) from the provider
-                if ((tileMgmtThread != null && tileMgmtThread.getAndSetDataChanged(false)) || rerenderRequested || offsetChanged) {
+                if ((tileMgmtThread != null && providerDataChangeCpy) || rerenderRequestedCpy || offsetChanged) {
                     visibleTileChange = getVisibleTileChanges(snapshot.visibleTileIdRange);
                 }
 
-                if (visibleTileChange || offsetChanged || rerenderRequested) {
+                if (visibleTileChange || offsetChanged || rerenderRequestedCpy) {
 
                     try {
 
@@ -385,7 +390,6 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
                     }
 
                     // turn off flags that might not be set each iteration
-                    rerenderRequested = false;
                     visibleTileChange = false;
 
                 }
@@ -609,7 +613,7 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
             int newOffX = - (int) distanceX;
             int newOffY = - (int) distanceY;
 
-            TileRange updatedRange = state.goToCoordinatesOffset(newOffX, newOffY);
+            TileRange updatedRange = state.goToCoordinatesOffset(newOffX, newOffY, false);
             if(updatedRange != null){
                 tileProvider.notifyTileIDRangeChange(updatedRange);
             }
