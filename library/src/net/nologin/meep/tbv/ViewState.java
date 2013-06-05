@@ -50,16 +50,16 @@ public final class ViewState {
         }
         this.bounds = bounds;
 
-        this.gridBuffer = Math.max(0,tileGridBuffer); // 0 or greater!
+        this.gridBuffer = Math.max(0, tileGridBuffer); // 0 or greater!
 
         tilesHoriz = calculateNumTiles(screenW);
         tilesVert = calculateNumTiles(screenH);
 
     }
 
-    public synchronized Snapshot updateRenderSnapshot(){
+    public synchronized Snapshot updateRenderSnapshot() {
 
-        if(snapshot == null){
+        if (snapshot == null) {
             snapshot = new Snapshot();
         }
         snapshot.visibleTileIdRange = this.visibleTileIdRange;
@@ -72,7 +72,7 @@ public final class ViewState {
         return snapshot;
     }
 
-    public synchronized TileRange getVisibleTileIdRange(){
+    public synchronized TileRange getVisibleTileIdRange() {
         return visibleTileIdRange;
     }
 
@@ -86,27 +86,29 @@ public final class ViewState {
         Pair<Integer, Integer> range_horiz = calculateTileIDRange(newXCoord, tilesHoriz);
         Pair<Integer, Integer> range_vert = calculateTileIDRange(newYCoord, tilesVert);
 
-//        if (bounds != null) {
-//
-//            /* Important to check horizontal and vertical bounds independently, so that diagonal swipes that
-//               hit a boundary continue to update the scroll.  (Eg, if I'm at the top boundary, and swipe up-left,
-//               I still want the left part of that scroll to be obeyed */
-//            // left, top, right, and bottom ID
-//            if ((bounds[0] != null && range_horiz.first < bounds[0])
-//                    || (bounds[2] != null && range_horiz.second > bounds[2])) {
-//                // Horizontal check fails, keep existing values
-//                range_horiz = new Pair<Integer, Integer>(visibleTileIdRange.left, visibleTileIdRange.right);
-//                newXCoord = xCoordinate;
-//            }
-//
-//            if ((bounds[1] != null && range_vert.first < bounds[1])
-//                    || (bounds[3] != null && range_vert.second > bounds[3])) {
-//                // Vertical check fails, keep existing values
-//                range_vert = new Pair<Integer, Integer>(visibleTileIdRange.top, visibleTileIdRange.bottom);
-//                newYCoord = yCoordinate;
-//            }
-//
-//        }
+        if (bounds != null && visibleTileIdRange != null) {
+
+            /* Important to check horizontal and vertical bounds independently, so that diagonal swipes that
+               hit a boundary continue to update the scroll.  (Eg, if I'm at the top boundary, and swipe up-left,
+               we still want the left part of that scroll to be obeyed.
+
+               The bounds are defined against the visible range, not that with the gridBuffer, so compare accordingly.
+            */
+            if ((bounds[0] != null && range_horiz.first + gridBuffer < bounds[0])  // left
+                    || (bounds[2] != null && range_horiz.second - gridBuffer > bounds[2])) {  // right
+                // Horizontal check fails, keep existing values
+                range_horiz = new Pair<Integer, Integer>(visibleTileIdRange.left, visibleTileIdRange.right);
+                newXCoord = xCoordinate;
+            }
+
+            if ((bounds[1] != null && range_vert.first + gridBuffer < bounds[1]) // top
+                    || (bounds[3] != null && range_vert.second - gridBuffer > bounds[3])) { // bottom
+                // Vertical check fails, keep existing values
+                range_vert = new Pair<Integer, Integer>(visibleTileIdRange.top, visibleTileIdRange.bottom);
+                newYCoord = yCoordinate;
+            }
+
+        }
 
         TileRange newRange = new TileRange(range_horiz.first, range_vert.first, range_horiz.second, range_vert.second);
         xCoordinate = newXCoord;
@@ -189,8 +191,6 @@ public final class ViewState {
         return zoomFactor;
 
     }
-
-
 
 
 }

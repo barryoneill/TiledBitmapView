@@ -104,6 +104,13 @@ public abstract class TiledBitmapView extends SurfaceView implements SurfaceHold
         return debugEnabled;
     }
 
+    public void setDebugEnabled(boolean debugEnabled) {
+        this.debugEnabled = debugEnabled;
+        if(tileDrawThread != null) {
+            tileDrawThread.requestRerender();
+        }
+    }
+
     @Override
     public Parcelable onSaveInstanceState() {
 

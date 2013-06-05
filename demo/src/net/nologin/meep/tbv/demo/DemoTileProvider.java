@@ -50,7 +50,7 @@ public class DemoTileProvider implements TileProvider {
 
     @Override
     public int getGridBufferSize() {
-        return 2;
+        return 1;
     }
 
     @Override
@@ -108,9 +108,6 @@ public class DemoTileProvider implements TileProvider {
         }
 
 
-        //Canvas c = new Canvas(bmp);
-        //c.drawText(t.xId+","+t.yId, 30, 80, tileTextPaint);
-
         t.setBmpData(bmp);
 
         // put it in the cache for the UI thread to find via getTile()
@@ -124,8 +121,7 @@ public class DemoTileProvider implements TileProvider {
     @Override
     public Integer[] getTileIndexBounds(){
 
-        //return null; // no limit to scrolling
-        return new Integer[]{-8,-8,-8,-8};
+        return null; // no limit to scrolling
 
     }
 
