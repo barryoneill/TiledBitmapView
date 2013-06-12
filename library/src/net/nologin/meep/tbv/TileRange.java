@@ -13,19 +13,33 @@ public class TileRange {
     }
 
     public boolean contains(Tile t) {
+        return contains(t,0);
+    }
+    
+    public boolean contains(Tile t, int buffer) {
 
-        return t != null && contains(t.xId, t.yId);
+        return t != null && contains(t.xId, t.yId, buffer);
 
     }
 
     public boolean contains(int x, int y) {
+        return contains(x,y,0);
+    }
+
+    public boolean contains(int x, int y, int buffer) {
+
+        buffer = Math.max(0,buffer);
 
         return
                 // check for empty first
                 left < right && top < bottom
                         // then containment (inclusive of all boundaries, unlike android.graphics.Rect)
-                        && x >= left && x <= right && y >= top && y <= bottom;
+                        && x >= left - buffer
+                        && x <= right + buffer
+                        && y >= top - buffer
+                        && y <= bottom + buffer;
     }
+
 
     public int numTilesHorizontal() {
         if (left > right) {

@@ -39,6 +39,36 @@ public class GenericTileProvider implements TileProvider {
         paintTileTxt.setAntiAlias(true);
         paintTileTxt.setTextAlign(Paint.Align.CENTER);
 
+        genSharedBitmap();
+
+    }
+
+    private void genSharedBitmap(){
+
+        int w = getTileWidthPixels();
+
+        sharedTileBmp = Bitmap.createBitmap(w, w, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(sharedTileBmp);
+
+        // gray background
+        c.drawRect(0, 0, w, w, paintTileBG);
+
+        // yellow circle
+        c.drawCircle(w / 2, w / 2, w / 2 - 20, paintTileCircle);
+
+        // 'provider not registered' text
+        float txtY = w / 2;
+        String line1 = ctx.getResources().getString(R.string.genericprovider_tilemsg_line1);
+        String line2 = ctx.getResources().getString(R.string.genericprovider_tilemsg_line2);
+
+        c.drawText(line1, w / 2, txtY, paintTileTxt);
+        txtY += 20;
+        c.drawText(line2, w / 2, txtY, paintTileTxt);
+
+    }
+
+    protected Context getContext(){
+        return ctx;
     }
 
     @Override
@@ -71,35 +101,13 @@ public class GenericTileProvider implements TileProvider {
     }
 
     @Override
-    public boolean processQueue(TileRange visible) {
+    public boolean hasFreshData() {
 
 
         /* The processing done here only happens once and could be done in the constructor, but I'm
            putting it here - That way, any problems with the seperate thread that calls this will
            result in the problem being noticed sooner.
          */
-        if (sharedTileBmp == null) {
-
-            int w = getTileWidthPixels();
-
-            sharedTileBmp = Bitmap.createBitmap(w, w, Bitmap.Config.ARGB_8888);
-            Canvas c = new Canvas(sharedTileBmp);
-
-            // gray background
-            c.drawRect(0, 0, w, w, paintTileBG);
-
-            // yellow circle
-            c.drawCircle(w / 2, w / 2, w / 2 - 20, paintTileCircle);
-
-            // 'provider not registered' text
-            float txtY = w / 2;
-            String line1 = ctx.getResources().getString(R.string.genericprovider_tilemsg_line1);
-            String line2 = ctx.getResources().getString(R.string.genericprovider_tilemsg_line2);
-
-            c.drawText(line1, w / 2, txtY, paintTileTxt);
-            txtY += 20;
-            c.drawText(line2, w / 2, txtY, paintTileTxt);
-        }
 
         // signal that there's no more processing to be done
         return false;
@@ -114,14 +122,14 @@ public class GenericTileProvider implements TileProvider {
     }
 
     @Override
-    public void notifyTileIDRangeChange(TileRange newRange) {
+    public void onTileIDRangeChange(TileRange newRange) {
 
         // this provider doesn't need to know about this
 
     }
 
     @Override
-    public void notifyZoomFactorChange(float newZoom) {
+    public void onZoomFactorChange(float newZoom) {
 
         // no zooming in this provider
     }
@@ -130,5 +138,10 @@ public class GenericTileProvider implements TileProvider {
     public String getDebugSummary() {
 
         return GENERIC_DEBUG_MSG;
+    }
+
+    @Override
+    public void onSurfaceDestroyed() {
+        // nop
     }
 }

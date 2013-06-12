@@ -2,9 +2,9 @@
 <resources>
     <string name="app_name">TiledBitmapViewDemo</string>
     <string name="debug_warning">Please Note: Debug mode has a negative impact on performance</string>
-    <string name="button_jumptoorigin">Jump To Origin</string>
-    <string name="button_toggle_debugon">Debug Is On</string>
-    <string name="button_toggle_debugoff">Debug Is Off</string>
-    <string name="button_toggle_providercustom">Custom Provider</string>
-    <string name="button_toggle_providerdefault">Default Provider</string>
+    <string name="button_go_to_origin">Tile(0,0)</string>
+    <string name="button_toggle_debugon">Debug: On</string>
+    <string name="button_toggle_debugoff">Debug: Off</string>
+    <string name="button_toggle_providercustom">Prov: Stones</string>
+    <string name="button_toggle_providerdefault">Prov: Default</string>
 </resources>

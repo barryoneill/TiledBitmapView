@@ -13,14 +13,14 @@
         <!-- 'Jump To Origin' -->
         <Button
                 android:id="@+id/btn_backToOrigin"
-                android:layout_width="150dp"
+                android:layout_width="100dp"
                 android:layout_height="fill_parent"
-                android:text="@string/button_jumptoorigin"/>
+                android:text="@string/button_go_to_origin"/>
 
         <!-- 'Debug is On|Off' -->
         <ToggleButton
                 android:id="@+id/btn_debug_toggle"
-                android:layout_width="150dp"
+                android:layout_width="100dp"
                 android:layout_height="fill_parent"
                 android:textOn="@string/button_toggle_debugon"
                 android:textOff="@string/button_toggle_debugoff"/>

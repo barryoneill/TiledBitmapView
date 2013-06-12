@@ -34,8 +34,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     final Paint paint_bg, paint_debugTileTxt, paint_debugGridLine,
             paint_debugBoxBG, paint_debugBoxTxt, paint_debugBoxErrTxt;
 
-    TileGridDrawThread tileDrawThread;
-    TileGenThread tileGenThread;
+    TileSurfaceDrawThread surfaceDrawThread;
 
     ViewState state;
 
@@ -190,18 +189,14 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
 
-        // start both the tile generation and rendering threads if not running
+        // start the rendering thread
 
-        if (tileGenThread == null || !tileGenThread.isAlive()) {
-            tileGenThread = new TileGenThread();
-            tileGenThread.setRunning(true);
-            tileGenThread.start();
+        if (surfaceDrawThread == null || !surfaceDrawThread.isAlive()) {
+            surfaceDrawThread = new TileSurfaceDrawThread(holder);
+            surfaceDrawThread.setRunning(true);
+            surfaceDrawThread.start();
         }
-        if (tileDrawThread == null || !tileDrawThread.isAlive()) {
-            tileDrawThread = new TileGridDrawThread(holder);
-            tileDrawThread.setRunning(true);
-            tileDrawThread.start();
-        }
+
     }
 
     @Override
@@ -209,25 +204,20 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
         // Stop both background threads (Based on surfaceDestroyed() in the 'LunarLander' sample app)
 
+        if(tileProvider != null) {
+            tileProvider.onSurfaceDestroyed();
+        }
+
         boolean retry = true;
-        tileDrawThread.setRunning(false);
+        surfaceDrawThread.setRunning(false);
         while (retry) {
             try {
-                tileDrawThread.join();
+                surfaceDrawThread.join();
                 retry = false;
             } catch (InterruptedException ignored) {
             }
         }
 
-        retry = true;
-        tileGenThread.setRunning(false);
-        while (retry) {
-            try {
-                tileGenThread.join();
-                retry = false;
-            } catch (InterruptedException ignored) {
-            }
-        }
     }
 
 
@@ -266,7 +256,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
      * @param tileY The y tile coordinate
      * @param alwaysNotifyProvider If <code>false</code>, and the move does not result in a change in the tile IDs
      *                             required to render the view, then the provider won't get an update via
-     *                             {@link TileProvider#notifyTileIDRangeChange(TileRange)}.  If <code>true</code>,
+     *                             {@link TileProvider#onTileIDRangeChange(TileRange)}.  If <code>true</code>,
      *                             the provider will always get notified, even if the range is unchanged.
      */
     public void moveToTile(int tileX, int tileY, boolean alwaysNotifyProvider) {
@@ -292,7 +282,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
         // update the state for those coordinates,
         TileRange updatedRange = state.setSurfaceOffset(newX, newY, alwaysNotifyProvider);
         if (updatedRange != null) {
-            tileProvider.notifyTileIDRangeChange(updatedRange);
+            tileProvider.onTileIDRangeChange(updatedRange);
         }
 
         notifyThreads();
@@ -302,74 +292,13 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     // TODO: review this method's role.
     private void notifyThreads() {
 
-        if (tileDrawThread != null) {
-            tileDrawThread.requestRerender();
+        if (surfaceDrawThread != null) {
+            surfaceDrawThread.requestRerender();
         }
 
     }
 
-
-    /**
-     * The TileGenThread simply loops in the background, and repeatedly gives the provider a chance to
-     * render any pending tiles it may have determined is necessary.
-     */
-    class TileGenThread extends Thread {
-
-        private boolean running = false;
-
-        // atomic as it'll be monitored and unset by the rendering thread
-        private AtomicBoolean dataChanged = new AtomicBoolean(true);
-
-        TileRange range = null;
-
-        public TileGenThread() {
-
-
-        }
-
-        public void setRunning(boolean running) {
-            this.running = running;
-        }
-
-        @Override
-        public void run() {
-
-
-            while (running) {
-
-                if (tileProvider == null || state == null) {
-                    continue;
-                }
-
-                range = state.getVisibleTileIdRange();
-                if (range == null) {
-                    continue;
-                }
-
-
-                boolean somethingGenerated = tileProvider.processQueue(range);
-                if (somethingGenerated) {
-
-                    // only set the flag to true, let the rendering thread set it to false
-                    dataChanged.set(true);
-
-                    try {
-
-                        /* back off a bit if there was nothing done. Perhaps this needs to be slightly less
-                         * dumb, eg, sleep only after 5 successive empty calls. Or perhaps not needed at all.. */
-                        Thread.sleep(20);
-                    } catch (InterruptedException ignored) {
-                    }
-                }
-
-            }
-
-        }
-
-    }
-
-
-    class TileGridDrawThread extends Thread {
+    class TileSurfaceDrawThread extends Thread {
 
         private final SurfaceHolder holder;
         boolean running = false;
@@ -382,7 +311,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
         private int[][] visibleTilesHistory;
 
 
-        public TileGridDrawThread(SurfaceHolder holder) {
+        public TileSurfaceDrawThread(SurfaceHolder holder) {
             this.holder = holder;
         }
 
@@ -406,7 +335,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
             int xCanvasOffsetOld = 0, yCanvasOffsetOld = 0;
 
-            boolean providerDataChangeCpy, rerenderRequestedCpy;
+            boolean rerenderRequestedCpy;
 
             while (running) {
 
@@ -430,11 +359,11 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
                 yCanvasOffsetOld = snapshot.canvasOffsetY;
 
                 // get and set both to false
-                providerDataChangeCpy = tileGenThread.dataChanged.getAndSet(false);
+//                providerDataChangeCpy = tileGenThread.dataChanged.getAndSet(false);
                 rerenderRequestedCpy = rerenderRequested.getAndSet(false);
 
                 // get changes in tile contents (if any) from the provider
-                if ((tileGenThread != null && providerDataChangeCpy) || rerenderRequestedCpy || offsetChanged) {
+                if (tileProvider.hasFreshData() || rerenderRequestedCpy || offsetChanged) {
                     visibleTileChange = getVisibleTileChanges(snapshot.visibleTileIdRange);
                 }
 
@@ -535,6 +464,8 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
         }
 
         public void doDrawTileGrid(Canvas canvas, ViewState.Snapshot snapshot) {
+
+            Log.e(Utils.LOG_TAG,"drawin'");
 
             canvas.save();
 
@@ -639,7 +570,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     }
 
 
-    @Override // register GD
+    @Override
     public boolean onTouchEvent(MotionEvent me) {
 
         invalidate();
@@ -659,7 +590,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
             float newZoomFactor = state.updateZoomFactor(detector.getScaleFactor());
 
             // let the provider know something has changed
-            tileProvider.notifyZoomFactorChange(newZoomFactor);
+            tileProvider.onZoomFactorChange(newZoomFactor);
 
             notifyThreads();
 
@@ -686,7 +617,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
             TileRange updatedRange = state.setSurfaceOffsetRelative(newOffX, newOffY, false);
             if (updatedRange != null) {
-                tileProvider.notifyTileIDRangeChange(updatedRange);
+                tileProvider.onTileIDRangeChange(updatedRange);
             }
             return true;
         }
