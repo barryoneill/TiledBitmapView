@@ -226,7 +226,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
         // create a state object that will maintain changes within this surface configuration
         state = new ViewState(width, height, tileProvider.getTileWidthPixels(),
-                tileProvider.getTileIndexBounds(), tileProvider.getGridBufferSize());
+                tileProvider.getTileIndexBounds());
 
         // start off at the origin tile.
         moveToTile(0, 0, true);

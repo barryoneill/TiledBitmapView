@@ -13,6 +13,8 @@ public class DemoTileProvider extends GenericTileProvider {
 
     private static final String DEBUG_SUMMARY_FMT = "StonesProv[cache=%d]";
 
+    private static final int OFFSCREEN_TILE_BUFFER = 1;
+
     private ExecutorService executorService;
     private Future lastSubmittedTask;
 
@@ -20,8 +22,6 @@ public class DemoTileProvider extends GenericTileProvider {
     private final Map<Long,Tile> tileCache;
 
     private final Map<String,Bitmap> resCache;
-
-
 
     private AtomicBoolean hasFreshData = new AtomicBoolean(false);
 
@@ -37,11 +37,6 @@ public class DemoTileProvider extends GenericTileProvider {
 
     }
 
-
-    @Override
-    public int getGridBufferSize() {
-        return 1;
-    }
 
     @Override
     public Tile getTile(int x, int y) {
@@ -74,7 +69,7 @@ public class DemoTileProvider extends GenericTileProvider {
         // clear out the bitmaps of any off-screen cached tiles, so we don't gobble ram
         Collection<Tile> entries = tileCache.values();
         for(Tile t : entries){
-            if(t.getBmpData() != null && !newRange.contains(t)){ // TODO: investigate buffer removal
+            if(t.getBmpData() != null && !newRange.contains(t,OFFSCREEN_TILE_BUFFER)){
                t.clearBmpData();
             }
 

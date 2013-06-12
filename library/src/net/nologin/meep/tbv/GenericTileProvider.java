@@ -77,11 +77,6 @@ public class GenericTileProvider implements TileProvider {
     }
 
     @Override
-    public int getGridBufferSize() {
-        return 0; // no need for a 'buffer' of tiles
-    }
-
-    @Override
     public Tile getTile(int x, int y) {
 
         Tile t = new Tile(x, y);

@@ -83,17 +83,17 @@ public interface TileProvider {
      */
     public GridAnchor getGridAnchor();
 
-
-    /**
-     * By default the tile grid size is the minimum needed to cover rendering the view area.  This is good
-     * for minimizing the number of calls for tile fetching, but leads to a poorer experience when scrolling (newly
-     * displayed area is empty for a brief moment while fetching).  Use this value to increase the grid size to
-     * include a 'buffer' of off-screen tiles, which leads to a better scrolling experience.  Keep in mind that a
-     * larger grid size means more fetching/processing.
-     *
-     * @return The 'buffer tile' size. Eg, setting this to one would increase a grid of 6x4 tiles to a 7x5 grid.
-     */
-    public int getGridBufferSize();
+//
+//    /**
+//     * By default the tile grid size is the minimum needed to cover rendering the view area.  This is good
+//     * for minimizing the number of calls for tile fetching, but leads to a poorer experience when scrolling (newly
+//     * displayed area is empty for a brief moment while fetching).  Use this value to increase the grid size to
+//     * include a 'buffer' of off-screen tiles, which leads to a better scrolling experience.  Keep in mind that a
+//     * larger grid size means more fetching/processing.
+//     *
+//     * @return The 'buffer tile' size. Eg, setting this to one would increase a grid of 6x4 tiles to a 7x5 grid.
+//     */
+//    public int getGridBufferSize();
 
 
 }

@@ -27,8 +27,6 @@ public final class ViewState {
 
     private final Integer[] bounds;
 
-    private final int gridBuffer;
-
     private int surfaceOffsetX, surfaceOffsetY;
     private int canvasOffsetX, canvasOffsetY;
     private TileRange visibleTileIdRange;
@@ -44,7 +42,7 @@ public final class ViewState {
 
     }
 
-    public ViewState(int screenW, int screenH, int tileWidth, Integer[] bounds, int tileGridBuffer) {
+    public ViewState(int screenW, int screenH, int tileWidth, Integer[] bounds) {
 
         this.screenW = screenW;
         this.screenH = screenH;
@@ -55,8 +53,6 @@ public final class ViewState {
             bounds = null;
         }
         this.bounds = bounds;
-
-        this.gridBuffer = Math.max(0, tileGridBuffer); // 0 or greater!
 
         tilesHoriz = calculateNumTiles(screenW);
         tilesVert = calculateNumTiles(screenH);
@@ -78,10 +74,6 @@ public final class ViewState {
         return snapshot;
     }
 
-    public synchronized TileRange getVisibleTileIdRange() {
-        return visibleTileIdRange;
-    }
-
     public synchronized TileRange setSurfaceOffsetRelative(int relOffsetX, int relOffsetY, boolean alwaysReturnRange) {
 
         return setSurfaceOffset(surfaceOffsetX + relOffsetX, surfaceOffsetY + relOffsetY, alwaysReturnRange);
@@ -97,18 +89,16 @@ public final class ViewState {
             /* Important to check horizontal and vertical bounds independently, so that diagonal swipes that
                hit a boundary continue to update the scroll.  (Eg, if I'm at the top boundary, and swipe up-left,
                we still want the left part of that scroll to be obeyed.
-
-               The bounds are defined against the visible range, not that with the gridBuffer, so compare accordingly.
             */
-            if ((bounds[0] != null && range_horiz.first + gridBuffer < bounds[0])  // left
-                    || (bounds[2] != null && range_horiz.second - gridBuffer > bounds[2])) {  // right
+            if ((bounds[0] != null && range_horiz.first < bounds[0])  // left
+                    || (bounds[2] != null && range_horiz.second > bounds[2])) {  // right
                 // Horizontal check fails, keep existing values
                 range_horiz = new Pair<Integer, Integer>(visibleTileIdRange.left, visibleTileIdRange.right);
                 offsetX = surfaceOffsetX;
             }
 
-            if ((bounds[1] != null && range_vert.first + gridBuffer < bounds[1]) // top
-                    || (bounds[3] != null && range_vert.second - gridBuffer > bounds[3])) { // bottom
+            if ((bounds[1] != null && range_vert.first < bounds[1]) // top
+                    || (bounds[3] != null && range_vert.second > bounds[3])) { // bottom
                 // Vertical check fails, keep existing values
                 range_vert = new Pair<Integer, Integer>(visibleTileIdRange.top, visibleTileIdRange.bottom);
                 offsetY = surfaceOffsetY;
@@ -132,11 +122,6 @@ public final class ViewState {
             canvasOffsetY -= tileWidth;
         }
 
-        // if the provider specifies a grid buffer, we need to move left/up that many tiles
-        canvasOffsetX -= tileWidth * gridBuffer;
-        canvasOffsetY -= tileWidth * gridBuffer;
-
-
         // call notify only on range change
         if (visibleTileIdRange == null || !newRange.equals(visibleTileIdRange)) {
             visibleTileIdRange = newRange;
@@ -158,11 +143,8 @@ public final class ViewState {
             startTileId--;
         }
 
-        startTileId -= gridBuffer;
-
         int endTileId = startTileId + numTiles - 1;
 
-        // include the buffer!
         return new Pair<Integer, Integer>(startTileId, endTileId);
     }
 
@@ -180,8 +162,6 @@ public final class ViewState {
 
         /* An additional tile if the int division above floored */
         num += (availablePx % tileWidth == 0 ? 0 : 1);
-
-        num += gridBuffer * 2; // to cover buffer tiles either side of the range
 
         return num;
     }
