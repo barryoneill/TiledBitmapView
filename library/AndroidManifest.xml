@@ -1,9 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="net.nologin.meep.tbv" android:versionCode="1" android:versionName="1.0">
+    <!--
+       TiledBitmapView currently support applications from API Level: 10 (2.3.3/GINGERBREAD_MR1) upwards.
+
+       Unless you use manifest merging (eg manifestmerger.enabled=true in ant) while building, this 'uses-sdk'
+       declaration has no effect and exists solely as a reminder, as well as for IDE hints.
+
+    -->
+    <uses-sdk  android:minSdkVersion="10" android:targetSdkVersion="17"/>
     <application>
         <!--
-            This is a android library project, and doesn't configure any applications
+            This is a android library project, and doesn't configure any applications.
             Ensure 'Is Library' is checked in the 'Android' section of your IDE's project config.
         -->
     </application>

@@ -3,46 +3,53 @@ package net.nologin.meep.tbv;
 import android.util.Pair;
 
 /**
- * Used to specify a position on the screen where the view can scroll to in oder to
- * display a desired tile ID.  Eg, for some apps, it makes sense, when going to the
- * Origin (0,0) tile, to scroll so that tile is in the center of the view.  For other
- * apps, it may make sense to have the origin elsewhere.
+ * When repositioning the grid to display a certain tile, this enum can be used to instruct the creation
+ * of the grid in such a way that the desired tile is located at the desired position on the view surface.
  */
 public enum GridAnchor {
 
-    NW, N, NE,
-    W, CENTER, E,
-    SW, S, SE;
+    TopLeft, TopCenter, TopRight,
+    CenterLeft, Center, CenterRight,
+    BottomLeft, BottomCenter, BottomRight;
 
-
-    final Pair<Integer,Integer> getOriginCoords(int width, int height, int tilew) {
+    /**
+     * Calculate the x,y (or left,top in canvas speak) coordinates at which a tile would need
+     * to be drawn to match this constant.
+     *
+     * @param surfaceWidth  The screen width in px
+     * @param surfaceHeight The screen height in px
+     * @param tileWidth    The width of a tile in px
+     * @return A {@link Pair} containing the (left,top) position as described.
+     */
+    final Pair<Integer, Integer> getPosition(int surfaceWidth, int surfaceHeight, int tileWidth) {
 
         // default to 0,0 (covers left hand side and across top)
-        int x=0, y=0;
+        int x = 0, y = 0;
 
         // anchors vertical through the middle
-        if(N == this || CENTER == this || S == this){
-            x = (width - tilew)/2;
+        if (TopCenter == this || Center == this || BottomCenter == this) {
+            x = (surfaceWidth - tileWidth) / 2;
         }
 
         // anchors down the right hand side
-        if(NE == this || E == this || SE == this){
-            x = width - tilew;
+        if (TopRight == this || CenterRight == this || BottomRight == this) {
+            x = surfaceWidth - tileWidth;
         }
 
         // anchors horizontal through the middle
-        if(W == this || CENTER == this || E == this){
-            y = (height - tilew)/2;
+        if (CenterLeft == this || Center == this || CenterRight == this) {
+            y = (surfaceHeight - tileWidth) / 2;
         }
 
         // anchors along the bottom
-        if(SW == this || S == this || SE == this) {
-            y = height - tilew;
+        if (BottomLeft == this || BottomCenter == this || BottomRight == this) {
+            y = surfaceHeight - tileWidth;
         }
 
         // Aside: debate on '==' vs equals for enums at the following page:
         // http://stackoverflow.com/questions/1750435/comparing-java-enum-members-or-equals
 
-        return new Pair<Integer, Integer>(x,y);
+        // my kingdom for a core language tuple
+        return new Pair<Integer, Integer>(x, y);
     }
 }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <color name="main_background_color">@android:color/black</color>
+
+    <color name="debug_box_bg">@android:color/black</color>
+    <color name="debug_box_text">@android:color/white</color>
+    <color name="debug_box_text_error">#FF0000</color>
+
+    <color name="debug_tile_text">@android:color/white</color>
+    <color name="debug_tile_border">#CCCCCC</color>
+
+
+</resources>

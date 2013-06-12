@@ -2,11 +2,12 @@ package net.nologin.meep.tbv;
 
 import android.graphics.Bitmap;
 import android.graphics.Rect;
-import android.util.Log;
 
 import java.lang.String;
 
 public class Tile {
+
+    public static final int DEFAULT_TILE_SIZE = 256;
 
     public final int size;
     public final int xId;
@@ -15,6 +16,10 @@ public class Tile {
 
     // TODO: doc
     private Bitmap bmpData;
+
+    public Tile(int xId, int yId) {
+        this(xId, yId, DEFAULT_TILE_SIZE);
+    }
 
     public Tile(int xId, int yId, int size) {
 

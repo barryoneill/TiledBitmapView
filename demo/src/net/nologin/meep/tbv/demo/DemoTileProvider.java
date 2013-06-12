@@ -2,35 +2,34 @@ package net.nologin.meep.tbv.demo;
 
 import android.content.Context;
 import android.graphics.*;
-import net.nologin.meep.tbv.GridAnchor;
-import net.nologin.meep.tbv.Tile;
-import net.nologin.meep.tbv.TileProvider;
-import net.nologin.meep.tbv.TileRange;
+import net.nologin.meep.tbv.*;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DemoTileProvider implements TileProvider {
+public class DemoTileProvider extends GenericTileProvider {
 
     private Context ctx;
     private static final String DEBUG_SUMMARY_FMT = "STProv[cache=%d,queue=%d]";
 
     // keep a cache of tiles we've already seen or are currently in the process of rendering
-     private final Map<Long,DemoTile> tileCache;
+     private final Map<Long,Tile> tileCache;
 
     private final Map<String,Bitmap> resCache;
 
     Paint tileTextPaint;
 
     // a queue of tiles to render in the background (in case of slow processing), must be multi-thread-friendly
-    private final List<DemoTile> renderQueue;
+    private final List<Tile> renderQueue;
 
     public DemoTileProvider(Context ctx){
 
+        super(ctx);
+
         this.ctx = ctx;
 
-        tileCache = new ConcurrentHashMap<Long,DemoTile>();
-        renderQueue = Collections.synchronizedList(new LinkedList<DemoTile>());
+        tileCache = new ConcurrentHashMap<Long,Tile>();
+        renderQueue = Collections.synchronizedList(new LinkedList<Tile>());
 
         resCache = new HashMap<String, Bitmap>();
 
@@ -42,11 +41,6 @@ public class DemoTileProvider implements TileProvider {
 
     }
 
-
-    @Override
-    public int getTileWidthPixels() {
-        return DemoTile.TILE_SIZE;
-    }
 
     @Override
     public int getGridBufferSize() {
@@ -62,15 +56,11 @@ public class DemoTileProvider implements TileProvider {
 
     }
 
-    @Override
-    public GridAnchor getGridAnchor() {
-        return GridAnchor.CENTER;
-    }
 
     @Override
     public boolean processQueue(TileRange visible) {
 
-        DemoTile t;
+        Tile t;
 
         // pop the next item to render off our queue
         synchronized (renderQueue){
@@ -118,19 +108,13 @@ public class DemoTileProvider implements TileProvider {
     }
 
 
-    @Override
-    public Integer[] getTileIndexBounds(){
-
-        return null; // no limit to scrolling
-
-    }
 
     @Override
     public void notifyTileIDRangeChange(TileRange newRange) {
 
         // clear out the bitmaps of any off-screen cached tiles, so we don't gobble ram
-        Collection<DemoTile> entries = tileCache.values();
-        for(DemoTile t : entries){
+        Collection<Tile> entries = tileCache.values();
+        for(Tile t : entries){
             if(t.getBmpData() != null && !newRange.contains(t)){
                t.clearBmpData();
             }
@@ -142,24 +126,19 @@ public class DemoTileProvider implements TileProvider {
             // wipe the render queue
             renderQueue.clear();
 
+            Tile t;
+
             for(int y = newRange.top; y <= newRange.bottom; y++) {
                 for(int x = newRange.left; x <= newRange.right; x++) {
 
-                    DemoTile t = (DemoTile)getTile(x, y);
+                    t = getTile(x, y);
                     if(t == null || t.getBmpData() == null){
-                        renderQueue.add(new DemoTile(x,y));
+                        renderQueue.add(new Tile(x,y));
                     }
 
                 }
             }
         }
-
-    }
-
-    @Override
-    public void notifyZoomFactorChange(float newZoom) {
-
-
 
     }
 

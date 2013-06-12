@@ -29,8 +29,8 @@ public final class ViewState {
 
     private final int gridBuffer;
 
-    private int xCoordinate, yCoordinate;
-    private int xCanvasOffset, yCanvasOffset;
+    private int surfaceOffsetX, surfaceOffsetY;
+    private int canvasOffsetX, canvasOffsetY;
     private TileRange visibleTileIdRange;
     private float zoomFactor = 1.0f; // ScaleListener sets this from 0.1 to 5.0
 
@@ -38,7 +38,7 @@ public final class ViewState {
 
     class Snapshot {
 
-        public int xCoordinate, yCoordinate, xCanvasOffset, yCanvasOffset;
+        public int surfaceOffsetX, surfaceOffsetY, canvasOffsetX, canvasOffsetY;
         public TileRange visibleTileIdRange;
         public float zoomFactor;
 
@@ -63,16 +63,16 @@ public final class ViewState {
 
     }
 
-    public synchronized Snapshot updateRenderSnapshot() {
+    public synchronized Snapshot createSnapshot() {
 
         if (snapshot == null) {
             snapshot = new Snapshot();
         }
         snapshot.visibleTileIdRange = this.visibleTileIdRange;
-        snapshot.xCoordinate = this.xCoordinate;
-        snapshot.yCoordinate = this.yCoordinate;
-        snapshot.xCanvasOffset = this.xCanvasOffset;
-        snapshot.yCanvasOffset = this.yCanvasOffset;
+        snapshot.surfaceOffsetX = this.surfaceOffsetX;
+        snapshot.surfaceOffsetY = this.surfaceOffsetY;
+        snapshot.canvasOffsetX = this.canvasOffsetX;
+        snapshot.canvasOffsetY = this.canvasOffsetY;
         snapshot.zoomFactor = this.zoomFactor;
 
         return snapshot;
@@ -82,15 +82,15 @@ public final class ViewState {
         return visibleTileIdRange;
     }
 
-    public synchronized TileRange goToCoordinatesOffset(int newOffX, int newOffY, boolean alwaysReturnRange) {
+    public synchronized TileRange setSurfaceOffsetRelative(int relOffsetX, int relOffsetY, boolean alwaysReturnRange) {
 
-        return goToCoordinates(xCoordinate + newOffX, yCoordinate + newOffY, alwaysReturnRange);
+        return setSurfaceOffset(surfaceOffsetX + relOffsetX, surfaceOffsetY + relOffsetY, alwaysReturnRange);
     }
 
-    public synchronized TileRange goToCoordinates(int newXCoord, int newYCoord, boolean alwaysReturnRange) {
+    public synchronized TileRange setSurfaceOffset(int offsetX, int offsetY, boolean alwaysReturnRange) {
 
-        Pair<Integer, Integer> range_horiz = calculateTileIDRange(newXCoord, tilesHoriz);
-        Pair<Integer, Integer> range_vert = calculateTileIDRange(newYCoord, tilesVert);
+        Pair<Integer, Integer> range_horiz = calculateTileIDRange(offsetX, tilesHoriz);
+        Pair<Integer, Integer> range_vert = calculateTileIDRange(offsetY, tilesVert);
 
         if (bounds != null && visibleTileIdRange != null) {
 
@@ -104,37 +104,37 @@ public final class ViewState {
                     || (bounds[2] != null && range_horiz.second - gridBuffer > bounds[2])) {  // right
                 // Horizontal check fails, keep existing values
                 range_horiz = new Pair<Integer, Integer>(visibleTileIdRange.left, visibleTileIdRange.right);
-                newXCoord = xCoordinate;
+                offsetX = surfaceOffsetX;
             }
 
             if ((bounds[1] != null && range_vert.first + gridBuffer < bounds[1]) // top
                     || (bounds[3] != null && range_vert.second - gridBuffer > bounds[3])) { // bottom
                 // Vertical check fails, keep existing values
                 range_vert = new Pair<Integer, Integer>(visibleTileIdRange.top, visibleTileIdRange.bottom);
-                newYCoord = yCoordinate;
+                offsetY = surfaceOffsetY;
             }
 
         }
 
         TileRange newRange = new TileRange(range_horiz.first, range_vert.first, range_horiz.second, range_vert.second);
-        xCoordinate = newXCoord;
-        yCoordinate = newYCoord;
+        surfaceOffsetX = offsetX;
+        surfaceOffsetY = offsetY;
 
-        xCanvasOffset = xCoordinate % tileWidth;
-        yCanvasOffset = yCoordinate % tileWidth;
+        canvasOffsetX = surfaceOffsetX % tileWidth;
+        canvasOffsetY = surfaceOffsetY % tileWidth;
 
         // in the case we're offset to the right, we need to start rendering 'back' a tile (the longer tile range
         // handles the case of left offset)
-        if (xCanvasOffset > 0) {
-            xCanvasOffset -= tileWidth;
+        if (canvasOffsetX > 0) {
+            canvasOffsetX -= tileWidth;
         }
-        if (yCanvasOffset > 0) {
-            yCanvasOffset -= tileWidth;
+        if (canvasOffsetY > 0) {
+            canvasOffsetY -= tileWidth;
         }
 
         // if the provider specifies a grid buffer, we need to move left/up that many tiles
-        xCanvasOffset -= tileWidth * gridBuffer;
-        yCanvasOffset -= tileWidth * gridBuffer;
+        canvasOffsetX -= tileWidth * gridBuffer;
+        canvasOffsetY -= tileWidth * gridBuffer;
 
 
         // call notify only on range change

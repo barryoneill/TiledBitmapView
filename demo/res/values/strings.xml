@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TiledBitmapViewDemo</string>
+    <string name="debug_warning">Please Note: Debug mode has a negative impact on performance</string>
+    <string name="button_jumptoorigin">Jump To Origin</string>
+    <string name="button_toggle_debugon">Debug Is On</string>
+    <string name="button_toggle_debugoff">Debug Is Off</string>
+    <string name="button_toggle_providercustom">Custom Provider</string>
+    <string name="button_toggle_providerdefault">Default Provider</string>
 </resources>

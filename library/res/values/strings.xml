@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
+    <string name="genericprovider_tilemsg_line1">No Provider</string>
+    <string name="genericprovider_tilemsg_line2">Registered</string>
 </resources>

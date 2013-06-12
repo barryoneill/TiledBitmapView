@@ -4,42 +4,66 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Toast;
 import android.widget.ToggleButton;
+import net.nologin.meep.tbv.TiledBitmapView;
 
+/**
+ * A simple demo activity to demonstrate how to interact with the TiledBitmapView, including registering a provider.
+ */
 public class TBVDemoActivity extends Activity {
 
-    DemoTileView stv;
+    TiledBitmapView tiledBitmapView;
     Button btnBackToOrigin;
-    ToggleButton btnToggleDebug;
+    ToggleButton btnToggleDebug, btnToggleProvider;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        stv = (DemoTileView)findViewById(R.id.simpleTileView);
-
+        tiledBitmapView = (TiledBitmapView)findViewById(R.id.simpleTileView);
         btnBackToOrigin = (Button)findViewById(R.id.btn_backToOrigin);
         btnToggleDebug = (ToggleButton)findViewById(R.id.btn_debug_toggle);
+        btnToggleProvider = (ToggleButton)findViewById(R.id.btn_provider_toggle);
 
-
+        // attach our 'Jump to Origin' button to the TBV method that centers the grid around tile 0,0
         btnBackToOrigin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                stv.jumpToOriginTile();
+                tiledBitmapView.moveToOriginTile();
             }
         });
 
-
-        btnToggleDebug.setChecked(stv.isDebugEnabled());
+        // Setup the toggle button that enables and disables the render of debug information on the TBV
+        btnToggleDebug.setChecked(tiledBitmapView.isDebugEnabled());
         btnToggleDebug.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                stv.toggleDebugEnabled();
+                tiledBitmapView.toggleDebugEnabled();
+                if(tiledBitmapView.isDebugEnabled()){
+                    // debug incurs a performance hit, perhaps better not to expose it to end users in your app
+                    Toast.makeText(TBVDemoActivity.this, R.string.debug_warning ,Toast.LENGTH_SHORT).show();
+                }
             }
         });
 
+        // register our 'demo' tile provider
+        tiledBitmapView.registerProvider(new DemoTileProvider(this));
+        btnToggleProvider.setChecked(true);
 
+        // and allow toggling between it and the dummy provider that comes with the TBV by default
+        btnToggleProvider.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(btnToggleProvider.isChecked()){
+                    tiledBitmapView.registerProvider(new DemoTileProvider(TBVDemoActivity.this));
+                }
+                else{
+                    tiledBitmapView.registerDefaultProvider();
+                }
+            }
+        });
 
 
     }
