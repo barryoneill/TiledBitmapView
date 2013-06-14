@@ -1,8 +1,5 @@
 package net.nologin.meep.tbv;
 
-
-import android.annotation.TargetApi;
-import android.os.Build;
 import android.util.Log;
 import android.util.Pair;
 
@@ -16,7 +13,6 @@ import android.util.Pair;
  * may have since updated the state.
  *
  */
-@TargetApi(Build.VERSION_CODES.ECLAIR)
 public final class ViewState {
 
     public final int tileWidth;
@@ -74,12 +70,16 @@ public final class ViewState {
         return snapshot;
     }
 
-    public synchronized TileRange setSurfaceOffsetRelative(int relOffsetX, int relOffsetY, boolean alwaysReturnRange) {
-
-        return setSurfaceOffset(surfaceOffsetX + relOffsetX, surfaceOffsetY + relOffsetY, alwaysReturnRange);
+    public synchronized TileRange getVisibleTileRange(){
+        return visibleTileIdRange;
     }
 
-    public synchronized TileRange setSurfaceOffset(int offsetX, int offsetY, boolean alwaysReturnRange) {
+    public synchronized boolean applySurfaceOffsetRelative(int relOffsetX, int relOffsetY) {
+
+        return applySurfaceOffset(surfaceOffsetX + relOffsetX, surfaceOffsetY + relOffsetY);
+    }
+
+    public synchronized boolean applySurfaceOffset(int offsetX, int offsetY) {
 
         Pair<Integer, Integer> range_horiz = calculateTileIDRange(offsetX, tilesHoriz);
         Pair<Integer, Integer> range_vert = calculateTileIDRange(offsetY, tilesVert);
@@ -107,6 +107,10 @@ public final class ViewState {
         }
 
         TileRange newRange = new TileRange(range_horiz.first, range_vert.first, range_horiz.second, range_vert.second);
+        boolean rangeHasChanged = (visibleTileIdRange == null || !newRange.equals(visibleTileIdRange));
+        visibleTileIdRange = newRange;
+
+
         surfaceOffsetX = offsetX;
         surfaceOffsetY = offsetY;
 
@@ -122,13 +126,7 @@ public final class ViewState {
             canvasOffsetY -= tileWidth;
         }
 
-        // call notify only on range change
-        if (visibleTileIdRange == null || !newRange.equals(visibleTileIdRange)) {
-            visibleTileIdRange = newRange;
-            return newRange;
-        } else {
-            return alwaysReturnRange ? newRange : null; // signal that no change in range occured
-        }
+        return rangeHasChanged;
 
     }
 

@@ -16,6 +16,7 @@ public class TBVDemoActivity extends Activity {
     TiledBitmapView tiledBitmapView;
     Button btnBackToOrigin;
     ToggleButton btnToggleDebug, btnToggleProvider;
+    DemoTileProvider demoProvider;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -49,7 +50,8 @@ public class TBVDemoActivity extends Activity {
         });
 
         // register our 'demo' tile provider
-        tiledBitmapView.registerProvider(new DemoTileProvider(this));
+        demoProvider = new DemoTileProvider(this);
+        tiledBitmapView.registerProvider(demoProvider);
         btnToggleProvider.setChecked(true);
 
         // and allow toggling between it and the dummy provider that comes with the TBV by default
@@ -57,7 +59,7 @@ public class TBVDemoActivity extends Activity {
             @Override
             public void onClick(View view) {
                 if(btnToggleProvider.isChecked()){
-                    tiledBitmapView.registerProvider(new DemoTileProvider(TBVDemoActivity.this));
+                    tiledBitmapView.registerProvider(demoProvider);
                 }
                 else{
                     tiledBitmapView.registerDefaultProvider();

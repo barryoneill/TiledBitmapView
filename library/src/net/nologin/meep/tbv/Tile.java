@@ -49,7 +49,7 @@ public class Tile {
      */
     public final long cacheKey;
 
-    /* The only mutable field in this class, the bitmap data is set by the provider, and can
+    /* The only mutable fields in this class, the bitmap data is set by the provider, and can
      * be cleared as well (usually when the provider detects that the tile has gone out of
      * range to prevent the heap memory from being gobbled up) */
     private Bitmap bmpData;
@@ -129,11 +129,18 @@ public class Tile {
     }
 
     /**
-     * @return The hashCode() of the contained bitmap, or <code>0</code> if the bitmap was <code>null</code>
+     * This method is used by the rendering thread to detect a change in bitmap data.  Bitmap hashcodes might
+     * be sufficient here, while a bit-by-bit comparison might be expensive.  Regardless of implementation,
+     * if two tiles return the same value, they'll be assumed to contain the same bitmap data.
+     *
+     * @return An identifying hashcode for the contained bitmap data.  Return <code>0</code> to indicate that
+     * there is no bitmap data contained in this tile.
      */
-    public int getBmpHashcode() {
+    public int getBitmapContentHash() {
+        // if we switch to something a bit more intensive than hashCode, consider caching the value on setBmpData
         return bmpData == null ? 0 : bmpData.hashCode();
     }
+
 
     public String toString() {
         return String.format("Tile[(%d,%d),%dpx]", xId, yId, size);

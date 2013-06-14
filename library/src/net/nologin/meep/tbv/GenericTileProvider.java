@@ -23,10 +23,13 @@ import android.graphics.*;
  */
 public class GenericTileProvider implements TileProvider {
 
-    // shared bitmap for all tiles
-    Bitmap sharedTileBmp = null;
+    private Context ctx;
+
+    private Bitmap sharedTileBmp = null;
 
     public GenericTileProvider(Context ctx) {
+
+        this.ctx = ctx;
 
         // create on startup once
         sharedTileBmp = generatedSharedBmp(ctx, getConfigTileSize());
@@ -70,6 +73,13 @@ public class GenericTileProvider implements TileProvider {
         c.drawText(line2, w / 2, txtY, paintTileTxt);
 
         return bmp;
+    }
+
+    /**
+     * @return The context provided to the constructor
+     */
+    protected Context getContext(){
+        return ctx;
     }
 
     @Override
