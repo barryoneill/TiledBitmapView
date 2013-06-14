@@ -1,60 +1,64 @@
 package net.nologin.meep.tbv;
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.*;
 
 /**
- * This class is the default TileProvider implementation that TiledBitmapView uses, and can be used as
- * a base for other providers.  It simply generates tiles that all carry the same yellow circle on black
- * background with the 'No Provider Registered' text.
+ * This class is a very basic/test provider implementation and is the default provider, should the developer
+ * forget to register their own with the {@link TiledBitmapView}.  It provides some sensible defaults for the less
+ * important methods, so can also be extended instead of having to implement your own {@link TileProvider} from scratch.
+ * <br/><br/>
+ * It creates placeholder bitmap on construction (A yellow circle on a grey background with the text <i>'no provider
+ * registered'</i>), and every tile served by this provider reuses it.  It serves only as a minimalistic base/default
+ * class and <b>should not be used as an example for your own provider</b> especially any that does anything more
+ * complicated than this one does.
+ * <br/><br/>
+ * To write a <b>proper</b> provider, take a look at the detailed javadoc of the {@link TileProvider} interface,
+ * and also checkout the <code>DemoTileProvider</code> implementation in the </code><b>TiledBitmapViewDemo</b>
+ * project for a proper example on how to asynchronously generate bitmaps.
+ *
+ * @see TiledBitmapView
+ * @see TileProvider
  */
 public class GenericTileProvider implements TileProvider {
 
-    // debug meaningless for this simple provider, static string is fine
-    private static final String GENERIC_DEBUG_MSG = "GenericProv[¯\\(°_o)/¯]";
-
-    private Context ctx;
-
-    Paint paintTileBG;
-    Paint paintTileCircle;
-    Paint paintTileTxt;
-
-    Bitmap sharedTileBmp = null; // same bitmap for all tiles, cache it
+    // shared bitmap for all tiles
+    Bitmap sharedTileBmp = null;
 
     public GenericTileProvider(Context ctx) {
 
-        this.ctx = ctx;
+        // create on startup once
+        sharedTileBmp = generatedSharedBmp(ctx, getConfigTileSize());
 
-        paintTileBG = new Paint();
-        paintTileBG.setColor(Color.DKGRAY);
+    }
 
-        paintTileCircle = new Paint();
-        paintTileCircle.setColor(Color.YELLOW);
+
+    private static Bitmap generatedSharedBmp(Context ctx, int w) {
+
+        Paint paintTileBG = new Paint();
+        paintTileBG.setColor(ctx.getResources().getColor(R.color.genericprovider_tile_bg));
+
+        Paint paintTileCircle = new Paint();
+        paintTileCircle.setColor(ctx.getResources().getColor(R.color.genericprovider_tile_circle));
         paintTileCircle.setTextSize(4);
         paintTileCircle.setAntiAlias(true);
 
-        paintTileTxt = new Paint();
+        Paint paintTileTxt = new Paint();
         paintTileTxt.setColor(Color.BLACK);
         paintTileTxt.setTextSize(20);
         paintTileTxt.setAntiAlias(true);
         paintTileTxt.setTextAlign(Paint.Align.CENTER);
 
-        genSharedBitmap();
+        Bitmap bmp = Bitmap.createBitmap(w, w, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(bmp);
 
-    }
-
-    private void genSharedBitmap(){
-
-        int w = getTileWidthPixels();
-
-        sharedTileBmp = Bitmap.createBitmap(w, w, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(sharedTileBmp);
-
-        // gray background
+        // background
         c.drawRect(0, 0, w, w, paintTileBG);
 
-        // yellow circle
-        c.drawCircle(w / 2, w / 2, w / 2 - 20, paintTileCircle);
+        // circle
+        int radius = w / 2 - 15;
+        c.drawCircle(w / 2, w / 2, radius, paintTileCircle);
 
         // 'provider not registered' text
         float txtY = w / 2;
@@ -65,78 +69,63 @@ public class GenericTileProvider implements TileProvider {
         txtY += 20;
         c.drawText(line2, w / 2, txtY, paintTileTxt);
 
-    }
-
-    protected Context getContext(){
-        return ctx;
+        return bmp;
     }
 
     @Override
-    public int getTileWidthPixels() {
+    public int getConfigTileSize() {
         return Tile.DEFAULT_TILE_SIZE;
     }
 
     @Override
     public Tile getTile(int x, int y) {
 
+        /* this is very fast, since every tile is the same.  Do not do this in a real provider, as this will result
+         * in a very sluggish tile surface. See class javadoc! */
         Tile t = new Tile(x, y);
-
-        // all tiles get the same bitmap
-        if (sharedTileBmp != null) {
-            t.setBmpData(sharedTileBmp);
-        }
-
+        t.setBmpData(sharedTileBmp);
         return t;
     }
 
     @Override
-    public GridAnchor getGridAnchor() {
+    public GridAnchor getConfigGridAnchor() {
         // put (0,0) in the middle of the screen
         return GridAnchor.Center;
     }
 
     @Override
     public boolean hasFreshData() {
-
-
-        /* The processing done here only happens once and could be done in the constructor, but I'm
-           putting it here - That way, any problems with the seperate thread that calls this will
-           result in the problem being noticed sooner.
-         */
-
-        // signal that there's no more processing to be done
+        // we're doing doing any asynchronous processing (you should!) so there's never any new data
         return false;
     }
 
-
     @Override
-    public Integer[] getTileIndexBounds() {
-
-        return null; // unlimited scrolling
-
+    public Integer[] getConfigTileIDLimits() {
+        // unbounded scrolling in every direction
+        return null;
     }
 
     @Override
     public void onTileIDRangeChange(TileRange newRange) {
-
-        // this provider doesn't need to know about this
-
+        // no caching or asynchronous processing (you should!), so nothing to do here.
     }
+
 
     @Override
     public void onZoomFactorChange(float newZoom) {
-
         // no zooming in this provider
     }
 
     @Override
     public String getDebugSummary() {
-
-        return GENERIC_DEBUG_MSG;
+        // debug meaningless for this simple provider, static string is fine
+        return "GenericProv[¯\\(°_o)/¯]";
     }
 
     @Override
     public void onSurfaceDestroyed() {
-        // nop
+        // if we were performing async processing, we'd
     }
+
+
 }

@@ -43,7 +43,7 @@ public class DemoTileProvider extends GenericTileProvider {
 
         /* don't render the tile here, that could hold up the UI.  The call to onTileIDRangeChange() will
          * let us add the required tiles to a queue that we can render in the bg in processQueue(). */
-        return tileCache.get(Tile.getCacheKey(x,y));
+        return tileCache.get(Tile.createCacheKey(x,y));
 
     }
 

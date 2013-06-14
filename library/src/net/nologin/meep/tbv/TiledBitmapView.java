@@ -14,15 +14,40 @@ import android.view.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * TiledBitmapView is an SurfaceView implementation, in which the screen is rendered as a grid of tiles.
- * The content of those tiles is fetched from a 'TileProvider' implementation, specified by the user of
- * the view.  Each tile has an ID, made up of its x and y coordinates (similar to android canvas
- * co-ordinates, the x and y values are increasing rightwards and downwards respectively).  Only the
- * required number of tiles to fill the screen are accessed at any given time, and there are provider
- * lifecycle methods to allow efficient release of resources as tiles are scolled out of view.
+ * The TileBitmapView is an attempt to offer a relatively simple SurfaceView whose bitmap contents come tilewise
+ * from a provider, similar to many mapping libraries (but that has nothing to do with mapping).  To use this
+ * TileBitmapView, the user simply plugs the appropriate XML tag into their layout.  They then get a reference
+ * to this view and call {@link #registerProvider(TileProvider)} with their own implementation of a {@link TileProvider}
+ * (which has extensive javadoc about its responsibilites).
+ * <br/><br/>
+ * <b>Tiles</b><br/>
+ * The surface is rendered as a grid of tiles.  {@link Tile} objects are identified by their x and y co-ordinates
+ * (not pixel co-ordinates, see {@link Tile} for more on tile coordinates). As the user manipulates the surface
+ * (e.g. scroll), we calculate which Tiles IDs are required, notify the {@link TileProvider}, and fetches the actual
+ * tile data from the provider.  Full javadoc of this interaction is documented in {@link TileProvider}.
+ *
+ * @see TileProvider
+ * @see Tile
  */
 
 public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callback {
+
+    /* The gist of what this view does:
+     * - On surface creation, calculate how many tiles make up the 'grid' of tiles that gets rendered, this doesn't
+     *   change during the lifetime of this surface.
+     * - Every time the canvas offset changes (eg, user scrolls, or we use a moveTo* method), we recalculate which
+     *   range (TileRange) of tile IDs need to take position within that grid, and at which offset the grid needs
+     *   to be rendered in order to maintain the facade of 'infinitely scrolling' (even though it's the same mxn
+     *   sized window that gets rendered over at a suitable % tilewidth offset.
+     * - All this data gets saved in a ViewState object.  Some of the fields are set on surface creation, others are updated
+     *   when the scroll changes.
+     * - Notify the provider (see the TileProvider javadoc) if this range has changed since the last move/scroll.
+     * - In a separate rendering thread (similar to the Lunar Lander sample app), we take a thread safe copy of the
+     *   relevant ViewState info (it could change during render), and we determine based on this state and what the
+     *   provider tells us whether anything has changed since the last rendering. If so, we do a render.  This model
+     *   allows the provider to process tiles asynchronously, and inform us when there's new data, so the user gets
+     *   the appearance of new tiles appearing as the data becomes available (noticable in apps like WolframCA).
+     */
 
     // onSaveInstanceState/onRestoreInstanceState keys
     private static final String STATEKEY_SUPERCLASS = "net.nologin.meep.tbv.super";
@@ -34,12 +59,16 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     final Paint paint_bg, paint_debugTileTxt, paint_debugGridLine,
             paint_debugBoxBG, paint_debugBoxTxt, paint_debugBoxErrTxt;
 
+    // the thread which redraws the surface when it determines that a redraw is neccessary
     TileSurfaceDrawThread surfaceDrawThread;
 
+    // holds the 'state' of the screen/tiles/offsets after every interaction with the user
     ViewState state;
 
+    // the registered provider
     TileProvider tileProvider;
 
+    // if true, we draw tile borders (appears as gridlines), and debug information on tiles and in an 'info' box
     private boolean debugEnabled;
 
     public TiledBitmapView(Context context, AttributeSet attrs) {
@@ -52,11 +81,10 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
         gestureDetector = new GestureDetector(context, new GestureListener());
         scaleDetector = new ScaleGestureDetector(context, new ScaleListener());
 
-        /* Just in case the user doesn't register their own provider, let's have a
-         * dummy one that generates something a bit more instructive than a blank screen */
+        // the user _should_ set their own, but this is more helpful when they forget/don't
         tileProvider = new GenericTileProvider(context);
 
-        // ------- cosmetic init --------
+        // ------- end view setup, configure paint objects --------
 
         Resources res = getResources();
 
@@ -97,8 +125,9 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
         // same as paint_debugBoxTxt, except for errors
         paint_debugBoxErrTxt = new Paint(paint_debugBoxTxt);
         paint_debugBoxErrTxt.setColor(res.getColor(R.color.debug_box_text_error));
-
     }
+
+
 
     /**
      * Register your tile provider implementation.  The view will reset to the origin, and start using
@@ -108,6 +137,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
      *                     will default to an instance of {@link GenericTileProvider}.
      */
     public void registerProvider(TileProvider tileProvider) {
+
         if (tileProvider == null) {
             Log.e(Utils.LOG_TAG, "Null supplied to registerProvider, defaulting to generic provider.");
             tileProvider = new GenericTileProvider(getContext());
@@ -175,6 +205,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     @Override
     public void onRestoreInstanceState(Parcelable state) {
 
+        // again, apart from the superclass state, we only restore debug state
         if (state instanceof Bundle) {
             Bundle bundle = (Bundle) state;
             this.debugEnabled = bundle.getBoolean(STATEKEY_DEBUG_ENABLED);
@@ -189,8 +220,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
 
-        // start the rendering thread
-
+        // start  rendering thread (stopped in surfaceDestroyed)
         if (surfaceDrawThread == null || !surfaceDrawThread.isAlive()) {
             surfaceDrawThread = new TileSurfaceDrawThread(holder);
             surfaceDrawThread.setRunning(true);
@@ -202,12 +232,12 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
 
-        // Stop both background threads (Based on surfaceDestroyed() in the 'LunarLander' sample app)
-
-        if(tileProvider != null) {
+        // the provider may have it's own async stuff, give it a chance to clean up
+        if (tileProvider != null) {
             tileProvider.onSurfaceDestroyed();
         }
 
+        // stop rendering thread (started in surfaceCreated), retry stuff based on LunarLander source
         boolean retry = true;
         surfaceDrawThread.setRunning(false);
         while (retry) {
@@ -224,9 +254,11 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
 
-        // create a state object that will maintain changes within this surface configuration
-        state = new ViewState(width, height, tileProvider.getTileWidthPixels(),
-                tileProvider.getTileIndexBounds());
+        /* This state initially contains the values that don't change with this surface configuration,
+         * but after each change in surface offset, it also contains the latest tilerange/offset configuration.
+         */
+        state = new ViewState(width, height, tileProvider.getConfigTileSize(),
+                tileProvider.getConfigTileIDLimits());
 
         // start off at the origin tile.
         moveToTile(0, 0, true);
@@ -249,11 +281,11 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
     /**
      * Adjust the scroll offset so that the view is 'focused' at the specified tile ID.  'Focused' means
-     * whatever {@link GridAnchor} has been specified by your TileProvider's
-     * {@link net.nologin.meep.tbv.TileProvider#getGridAnchor()} implementation.
+     * whatever {@link GridAnchor} has been specified by the tile provider.
+     * {@link net.nologin.meep.tbv.TileProvider#getConfigGridAnchor()} implementation.
      *
-     * @param tileX The x tile coordinate
-     * @param tileY The y tile coordinate
+     * @param tileX                The x tile coordinate
+     * @param tileY                The y tile coordinate
      * @param alwaysNotifyProvider If <code>false</code>, and the move does not result in a change in the tile IDs
      *                             required to render the view, then the provider won't get an update via
      *                             {@link TileProvider#onTileIDRangeChange(TileRange)}.  If <code>true</code>,
@@ -272,7 +304,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
         }
 
         // get left/top position (relative to the visible surface) where the anchor tile would be rendered
-        GridAnchor anchor = tileProvider.getGridAnchor();
+        GridAnchor anchor = tileProvider.getConfigGridAnchor();
         Pair<Integer, Integer> anchorCoords = anchor.getPosition(state.screenW, state.screenH, state.tileWidth);
 
         // now calculate how many pixels we'd need to 'scroll' from there to get to the desired tile
@@ -298,10 +330,14 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
     }
 
+    /* This thread runs for the lifetime of the surface.  It tries to minimize the number of renders by constantly
+     * checks to see if bitmap content or offsets have changed since the last render (or if the provider/user has
+     * manually triggered a rerender. */
     class TileSurfaceDrawThread extends Thread {
 
         private final SurfaceHolder holder;
         boolean running = false;
+
         private AtomicBoolean rerenderRequested = new AtomicBoolean(false);
 
         private boolean visibleTileChange, offsetChanged;
@@ -313,6 +349,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
         public TileSurfaceDrawThread(SurfaceHolder holder) {
             this.holder = holder;
+
         }
 
         public void setRunning(boolean running) {
@@ -321,7 +358,6 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
         public void requestRerender() {
             rerenderRequested.set(true);
-            Log.d(Utils.LOG_TAG, "setting rerender to true");
         }
 
         @Override
@@ -330,6 +366,9 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
             /* Make sure this thread has a slightly higher prio than the tile generation thread, so that
                even if tiles queue up, the grid rendering is smooth. */
             Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
+
+            // threadname = "TileSurfaceDrawThread (android original thread name, eg Thread-405)"
+            setName(this.getClass().getSimpleName() + "(" + getName() + ")");
 
             Canvas c;
 
@@ -359,7 +398,6 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
                 yCanvasOffsetOld = snapshot.canvasOffsetY;
 
                 // get and set both to false
-//                providerDataChangeCpy = tileGenThread.dataChanged.getAndSet(false);
                 rerenderRequestedCpy = rerenderRequested.getAndSet(false);
 
                 // get changes in tile contents (if any) from the provider
@@ -393,13 +431,6 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
                     visibleTileChange = false;
 
                 }
-
-
-                // NB: do not sleep while the canvas is locked
-//                try{
-//                    Thread.sleep(5);
-//                }
-//                catch(InterruptedException ignored){}
 
 
             }
@@ -465,7 +496,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
         public void doDrawTileGrid(Canvas canvas, ViewState.Snapshot snapshot) {
 
-            Log.e(Utils.LOG_TAG,"drawin'");
+            Log.e(Utils.LOG_TAG, "drawin'");
 
             canvas.save();
 
@@ -528,8 +559,8 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
             }
 
+            // -------------------  debug box at bottom right ------------------------
             if (debugEnabled) {
-                // -------------------  debug box at bottom right ------------------------
 
                 String fmt1 = "%dx%d, zf=%1.3f";
                 String fmt2 = "x=%5d,y=%5d, cx=%4d,cy=%4d";
@@ -537,7 +568,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
                 String msgOffset = String.format(fmt2, snapshot.surfaceOffsetX, snapshot.surfaceOffsetY, snapshot.canvasOffsetX, snapshot.canvasOffsetY);
                 String msgVisibleIds = snapshot.visibleTileIdRange.toString();
                 String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
-                String msgMemory = Utils.getMemStatus();
+                String msgMemory = Utils.getMemDebugString();
                 Paint paintMem = Utils.isHeapAlmostFull() ? paint_debugBoxErrTxt : paint_debugBoxTxt;
 
                 float boxWidth = 350, boxHeight = 110;
@@ -554,12 +585,14 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
                 canvas.drawText(msgProvider, boxMid, boxTop + 80, paint_debugBoxTxt);
                 canvas.drawText(msgMemory, boxMid, boxTop + 100, paintMem);
             }
+            // -----------------  end debug box ------------------------------------------
 
             canvas.restore();
 
         }
 
-        // used by the thread as a placeholder object when the provider isn't ready to give us a desired tile.
+        // Sometimes the provider screws up and sends back null instead of a tile with null content.  Can't
+        // work with null, have an tile ID to work with - this'll do to cover those blips.
         private class EmptyTile extends Tile {
             public EmptyTile(int x, int y) {
                 super(x, y, state.tileWidth);

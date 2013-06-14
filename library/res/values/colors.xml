@@ -10,5 +10,7 @@
     <color name="debug_tile_text">@android:color/white</color>
     <color name="debug_tile_border">#CCCCCC</color>
 
+    <color name="genericprovider_tile_bg">#333333</color>
+    <color name="genericprovider_tile_circle">#FFFF00</color>
 
 </resources>
