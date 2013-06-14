@@ -1,9 +1,15 @@
 package net.nologin.meep.tbv.demo;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
 import android.os.Bundle;
+import android.text.SpannableString;
+import android.text.method.LinkMovementMethod;
+import android.text.util.Linkify;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 import net.nologin.meep.tbv.TiledBitmapView;
@@ -14,7 +20,7 @@ import net.nologin.meep.tbv.TiledBitmapView;
 public class TBVDemoActivity extends Activity {
 
     TiledBitmapView tiledBitmapView;
-    Button btnBackToOrigin;
+    Button btnBackToOrigin, btnAbout;
     ToggleButton btnToggleDebug, btnToggleProvider;
     DemoTileProvider demoProvider;
 
@@ -23,10 +29,11 @@ public class TBVDemoActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
-        tiledBitmapView = (TiledBitmapView)findViewById(R.id.simpleTileView);
-        btnBackToOrigin = (Button)findViewById(R.id.btn_backToOrigin);
-        btnToggleDebug = (ToggleButton)findViewById(R.id.btn_debug_toggle);
-        btnToggleProvider = (ToggleButton)findViewById(R.id.btn_provider_toggle);
+        tiledBitmapView = (TiledBitmapView) findViewById(R.id.simpleTileView);
+        btnBackToOrigin = (Button) findViewById(R.id.btn_backToOrigin);
+        btnToggleDebug = (ToggleButton) findViewById(R.id.btn_debug_toggle);
+        btnToggleProvider = (ToggleButton) findViewById(R.id.btn_provider_toggle);
+        btnAbout = (Button) findViewById(R.id.btn_about);
 
         // attach our 'Jump to Origin' button to the TBV method that centers the grid around tile 0,0
         btnBackToOrigin.setOnClickListener(new View.OnClickListener() {
@@ -42,9 +49,9 @@ public class TBVDemoActivity extends Activity {
             @Override
             public void onClick(View view) {
                 tiledBitmapView.toggleDebugEnabled();
-                if(tiledBitmapView.isDebugEnabled()){
+                if (tiledBitmapView.isDebugEnabled()) {
                     // debug incurs a performance hit, perhaps better not to expose it to end users in your app
-                    Toast.makeText(TBVDemoActivity.this, R.string.debug_warning ,Toast.LENGTH_SHORT).show();
+                    Toast.makeText(TBVDemoActivity.this, R.string.debug_warning, Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -58,17 +65,40 @@ public class TBVDemoActivity extends Activity {
         btnToggleProvider.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(btnToggleProvider.isChecked()){
+                if (btnToggleProvider.isChecked()) {
                     tiledBitmapView.registerProvider(demoProvider);
-                }
-                else{
+                } else {
                     tiledBitmapView.registerDefaultProvider();
                 }
             }
         });
 
+        // attach about dialog
+        btnAbout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Context ctx = TBVDemoActivity.this;
+
+                final TextView message = new TextView(ctx);
+
+                final SpannableString s =
+                        new SpannableString(ctx.getText(R.string.dialog_about_text));
+                Linkify.addLinks(s, Linkify.WEB_URLS);
+                message.setText(s);
+                message.setMovementMethod(LinkMovementMethod.getInstance());
+
+                new AlertDialog.Builder(ctx)
+                        .setTitle(R.string.dialog_about_title)
+                        .setCancelable(true)
+                        .setIcon(android.R.drawable.ic_dialog_info)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .setView(message)
+                        .create().show();
+            }
+        });
 
     }
 
-
 }
+
+

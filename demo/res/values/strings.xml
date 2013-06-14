@@ -2,9 +2,15 @@
 <resources>
     <string name="app_name">TiledBitmapViewDemo</string>
     <string name="debug_warning">Please Note: Debug mode has a negative impact on performance</string>
-    <string name="button_go_to_origin">Tile(0,0)</string>
-    <string name="button_toggle_debugon">Debug: On</string>
-    <string name="button_toggle_debugoff">Debug: Off</string>
-    <string name="button_toggle_providercustom">Prov: Stones</string>
-    <string name="button_toggle_providerdefault">Prov: Default</string>
+    <string name="button_go_to_origin">(0,0)</string>
+    <string name="button_toggle_debugon">Debug</string>
+    <string name="button_toggle_debugoff">No Debug</string>
+    <string name="button_toggle_providercustom">Stones</string>
+    <string name="button_toggle_providerdefault">Generic</string>
+    <string name="button_about">\?</string>
+
+    <string name="dialog_about_title">What\'s This?</string>
+    <string name="dialog_about_text">This app is demonstation of a simple tile provider using the
+                                    TileBitmapView library. \n\nMore information at http://site.com/url/when/ready\n\n
+                                    Author: Barry O\'Neill, who accepts no responsibility whatsoever. *kaboom*</string>
 </resources>

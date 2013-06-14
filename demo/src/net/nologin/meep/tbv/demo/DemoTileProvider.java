@@ -13,12 +13,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * This provider (a subclass of {@link GenericTileProvider}) provides an example of writing a provider
  * which asynchronously generates tiles.  For this demo I took 'Stone texture' from the following page:
  * <p/>
- * http://seamless-pixels.blogspot.com/p/free-seamless-ground-textures.html
- * (http://3.bp.blogspot.com/-Ooh1GWkBwVU/UHU9EpVeurI/AAAAAAAADgQ/HcWIllWCHB4/s1600/Seamless+stones+00.jpg)
+ * <a href="http://seamless-pixels.blogspot.com/p/free-seamless-ground-textures.html">http://seamless-pixels.blogspot.com/p/free-seamless-ground-textures.html</a>
+ * (specifically the image: <a href="http://3.bp.blogspot.com/-Ooh1GWkBwVU/UHU9EpVeurI/AAAAAAAADgQ/HcWIllWCHB4/s1600/Seamless+stones+00.jpg">http://3.bp.blogspot.com/-Ooh1GWkBwVU/UHU9EpVeurI/AAAAAAAADgQ/HcWIllWCHB4/s1600/Seamless+stones+00.jpg</a>)
  * <p/>
  * This in itself is a tileable image, but I'm going to use the default size of 256px tiles, rather than just
- * deliver the same massive 1280px tile over and over :)  The images are broken up into 5 rows of five, and
- * stored in 'res/drawable-nodpi' with filenames such as sr1c2.png (for row1, column 2) etc.
+ * deliver the same massive 1280px tile over and over :)  The image was broken up into 25 smaller tiles (5 rows of 5),
+ * and stored in 'res/drawable-nodpi' with filenames such as sr1c2.png (for row1, column 2) etc.
  * <p/>
  * As per the instructions in {@link TileProvider}, on each call of
  * {@link #onTileIDRangeChange(net.nologin.meep.tbv.TileRange)} I create a queue of the tiles needed to fill

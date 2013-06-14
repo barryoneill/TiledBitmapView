@@ -13,14 +13,14 @@
         <!-- 'Jump To Origin' -->
         <Button
                 android:id="@+id/btn_backToOrigin"
-                android:layout_width="100dp"
+                android:layout_width="60dp"
                 android:layout_height="fill_parent"
                 android:text="@string/button_go_to_origin"/>
 
         <!-- 'Debug is On|Off' -->
         <ToggleButton
                 android:id="@+id/btn_debug_toggle"
-                android:layout_width="100dp"
+                android:layout_width="90dp"
                 android:layout_height="fill_parent"
                 android:textOn="@string/button_toggle_debugon"
                 android:textOff="@string/button_toggle_debugoff"/>
@@ -28,10 +28,17 @@
         <!-- 'Custom|Default Provider' -->
         <ToggleButton
                 android:id="@+id/btn_provider_toggle"
-                android:layout_width="150dp"
+                android:layout_width="90dp"
                 android:layout_height="fill_parent"
                 android:textOn="@string/button_toggle_providercustom"
                 android:textOff="@string/button_toggle_providerdefault"/>
+
+        <!-- '?'/About -->
+        <Button
+                android:id="@+id/btn_about"
+                android:layout_width="50dp"
+                android:layout_height="fill_parent"
+                android:text="@string/button_about"/>
 
     </LinearLayout>
 
