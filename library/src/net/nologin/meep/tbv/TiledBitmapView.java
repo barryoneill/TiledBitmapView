@@ -322,14 +322,14 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
             return;
         }
 
-        if (state == null || state.screenW == 0) {
+        if (state == null || state.surfaceW == 0) {
             Log.d(Utils.LOG_TAG, "Surface not ready yet, cannot go to tile (" + tileX + "," + tileY + ")");
             return;
         }
 
         // get left/top canvas position (px) where the anchor tile would be rendered
         GridAnchor anchor = tileProvider.getConfigGridAnchor();
-        Pair<Integer, Integer> anchorCoords = anchor.getPosition(state.screenW, state.screenH, state.tileWidth);
+        Pair<Integer, Integer> anchorCoords = anchor.getPosition(state.surfaceW, state.surfaceH, state.tileWidth);
 
         // now calculate how many pixels we'd need to 'scroll' from there to get to the desired tile
         int newX = anchorCoords.first - (state.tileWidth * tileX);
@@ -405,7 +405,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
                 }
 
                 // grab a snapshot of all UI-managed state data we need in order to render (synchronized)
-                snapshot = state.createSnapshot();
+                snapshot = state.getUpdatedSnapshot();
 
                 // another sanity check
                 if (snapshot.visibleTileIdRange == null) {
@@ -506,7 +506,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
             canvas.save();
 
             // blank out entire surface so empty tiles show up blank
-            canvas.drawRect(0, 0, state.screenW, state.screenH, paint_bg);
+            canvas.drawRect(0, 0, state.surfaceW, state.surfaceH, paint_bg);
 
             // offset our canvas, so we can draw our whole tiles on with simple 0,0 origin co-ordinates
             canvas.translate(snapshot.canvasOffsetX, snapshot.canvasOffsetY);
@@ -559,7 +559,7 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
                 String fmt1 = "%dx%d, zf=%1.3f";
                 String fmt2 = "x=%5d,y=%5d, cx=%4d,cy=%4d";
-                String msgResAndScale = String.format(fmt1, state.screenW, state.screenH, snapshot.zoomFactor);
+                String msgResAndScale = String.format(fmt1, state.surfaceW, state.surfaceH, snapshot.zoomFactor);
                 String msgOffset = String.format(fmt2, snapshot.surfaceOffsetX, snapshot.surfaceOffsetY, snapshot.canvasOffsetX, snapshot.canvasOffsetY);
                 String msgVisibleIds = snapshot.visibleTileIdRange.toString();
                 String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
@@ -568,11 +568,11 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
 
                 float boxWidth = 350, boxHeight = 110;
 
-                float boxLeft = state.screenW - boxWidth;
-                float boxTop = state.screenH - boxHeight;
+                float boxLeft = state.surfaceW - boxWidth;
+                float boxTop = state.surfaceH - boxHeight;
                 float boxMid = boxLeft + boxWidth / 2;
 
-                canvas.drawRect(boxLeft, boxTop, state.screenW, state.screenH, paint_debugBoxBG);
+                canvas.drawRect(boxLeft, boxTop, state.surfaceW, state.surfaceH, paint_debugBoxBG);
 
                 canvas.drawText(msgResAndScale, boxMid, boxTop + 20, paint_debugBoxTxt);
                 canvas.drawText(msgOffset, boxMid, boxTop + 40, paint_debugBoxTxt);
