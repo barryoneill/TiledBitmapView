@@ -9,30 +9,50 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+/**
+ * This provider (a subclass of {@link GenericTileProvider}) provides an example of writing a provider
+ * which asynchronously generates tiles.  For this demo I took 'Stone texture' from the following page:
+ * <p/>
+ * http://seamless-pixels.blogspot.com/p/free-seamless-ground-textures.html
+ * (http://3.bp.blogspot.com/-Ooh1GWkBwVU/UHU9EpVeurI/AAAAAAAADgQ/HcWIllWCHB4/s1600/Seamless+stones+00.jpg)
+ * <p/>
+ * This in itself is a tileable image, but I'm going to use the default size of 256px tiles, rather than just
+ * deliver the same massive 1280px tile over and over :)  The images are broken up into 5 rows of five, and
+ * stored in 'res/drawable-nodpi' with filenames such as sr1c2.png (for row1, column 2) etc.
+ * <p/>
+ * As per the instructions in {@link TileProvider}, on each call of
+ * {@link #onTileIDRangeChange(net.nologin.meep.tbv.TileRange)} I create a queue of the tiles needed to fill
+ * the surface.  In a background task I populate each of these with the correct one of the aforementioned
+ * bitmaps.  (The bitmaps themselves I cache, but it's just to give an idea).
+ *
+ * @see TileProvider
+ * @see TiledBitmapView
+ */
 public class DemoTileProvider extends GenericTileProvider {
 
     private static final String DEBUG_SUMMARY_FMT = "StonesProv[cache=%d]";
 
-    private static final int OFFSCREEN_TILE_BUFFER = 1;
-
+    // used for the starting and stopping of background tasks
     private ExecutorService executorService;
     private Future lastSubmittedTask;
 
     // keep a cache of tiles we've already seen or are currently in the process of rendering
-    private final Map<Long,Tile> tileCache;
+    private final Map<Long, Tile> tileCache;
 
-    private final Map<String,Bitmap> resCache;
+    // cache the 25 bitmaps as we load them from resources (25 256x256 bitmaps won't kill the heap)
+    private final Map<String, Bitmap> resCache;
 
+    // used to let the hasFreshData call know when we've got something for it to render
     private AtomicBoolean hasFreshData = new AtomicBoolean(false);
 
-    public DemoTileProvider(Context ctx){
+    public DemoTileProvider(Context ctx) {
 
         super(ctx);
 
+        // getTile and onTileIDRangeChange are invoked on different threads, but both access this (see TileProv doc)
+        tileCache = new ConcurrentHashMap<Long, Tile>();
 
-
-        tileCache = new ConcurrentHashMap<Long,Tile>();
-
+        // only our QueueProcessTask accesses this, no need for synchronization
         resCache = new HashMap<String, Bitmap>();
 
     }
@@ -41,77 +61,75 @@ public class DemoTileProvider extends GenericTileProvider {
     @Override
     public Tile getTile(int x, int y) {
 
-        /* don't render the tile here, that could hold up the UI.  The call to onTileIDRangeChange() will
-         * let us add the required tiles to a queue that we can render in the bg in processQueue(). */
-        return tileCache.get(Tile.createCacheKey(x,y));
+        /* as the TileProvider docs say, return empty tiles here if necessary, we can use 'hasFreshData'
+         * to get the provider to do another pull of tiles later. */
+        return tileCache.get(Tile.createCacheKey(x, y));
 
     }
 
-    // Wa-hey.
-    public boolean hasFreshData(){
+    @Override
+    public boolean hasFreshData() {
 
-        boolean res = hasFreshData.getAndSet(false);
+        // set this back to false if we've just told the provider data is ready, otherwise future calls
+        // will result in possibly unnecessary renders
+        return hasFreshData.getAndSet(false);
 
-        if(res){
-            Log.e(Utils.LOG_TAG," ----------------- has fresh data!");
-        }
-
-        return res;
     }
-
 
 
     @Override
     public void onTileIDRangeChange(TileRange newRange) {
 
-
-
-        // clear out the bitmaps of any off-screen cached tiles, so we don't gobble ram
+        /* clear out the bitmaps of any off-screen cached tiles, so we don't gobble up heap.  We're not using
+         * that much memory for the tiles, so we add a buffer of 1 to our criteria so when we scroll back to
+         * already seen tiles, they'll still have bitmap data.
+         */
         Collection<Tile> entries = tileCache.values();
-        for(Tile t : entries){
-            if(t.getBmpData() != null && !newRange.contains(t,OFFSCREEN_TILE_BUFFER)){
-               t.clearBmpData();
+        for (Tile t : entries) {
+            if (t.getBmpData() != null && !newRange.contains(t, 1)) {
+                t.clearBmpData();
             }
 
         }
 
-
-        // find out what visible tiles are missing bmp data, we'll add that to the queue
+        // create a list of all the requested tiles that have no bitmap data
         List<Tile> renderQueue = new LinkedList<Tile>();
         Tile t;
 
-        for(int y = newRange.top; y <= newRange.bottom; y++) {
-            for(int x = newRange.left; x <= newRange.right; x++) {
+        for (int y = newRange.top; y <= newRange.bottom; y++) {
+            for (int x = newRange.left; x <= newRange.right; x++) {
 
                 t = getTile(x, y);
-                if(t == null || t.getBmpData() == null){
-                    renderQueue.add(new Tile(x,y));
+                if (t == null || t.getBmpData() == null) {
+                    renderQueue.add(new Tile(x, y));
                 }
 
             }
         }
 
         // init the executor
-        if(executorService == null || executorService.isShutdown()){
+        if (executorService == null || executorService.isShutdown()) {
             executorService = Executors.newSingleThreadExecutor();
         }
 
         // kill any previous queue processing
-        if(lastSubmittedTask != null){
+        if (lastSubmittedTask != null) {
             lastSubmittedTask.cancel(true);
         }
 
-        // Fire off our jobby.
+        // fire off our background task
         lastSubmittedTask = executorService.submit(new QueueProcessTask(renderQueue));
 
     }
 
+    /**
+     * Populate the bitmaps of a provided list of tiles asynchronously.
+     */
     class QueueProcessTask implements Runnable {
 
         private List<Tile> renderQueue;
 
         public QueueProcessTask(List<Tile> renderQueue) {
-
             this.renderQueue = renderQueue;
 
         }
@@ -119,31 +137,23 @@ public class DemoTileProvider extends GenericTileProvider {
         @Override
         public void run() {
 
-            Log.e(Utils.LOG_TAG, " **** STARTING QUEUEPROCESSTASK!");
-
             Context ctx = getContext();
 
-            // THREAD_PRIORITY_MORE_FAVORABLE
+            while (!renderQueue.isEmpty()) {
 
-            while(!renderQueue.isEmpty()){
-
-                if(Thread.currentThread().isInterrupted()){
-                    Log.e(Utils.LOG_TAG, " ####################### argh I'm being killed");
+                // always keep checking to see if the view has requested that we stop
+                if (Thread.currentThread().isInterrupted()) {
+                    Log.d(Utils.LOG_TAG, "Current queue processing being interruped");
                     return;
                 }
 
-
                 Tile t = renderQueue.remove(0);
 
-                // anything to render?
-                if(t == null || t.getBmpData() != null){
-                    continue;
+                if (t == null || t.getBmpData() != null) {
+                    continue; // nothing to do
                 }
 
                 Log.d(Utils.LOG_TAG, "Processing tile " + t);
-
-                // okay, build the contents of the tile.  Doesn't matter if it's slow, we're in a bg thread
-                // plus this is just a demo so I won't tweak for performance here - but you should :)
 
                 // have tileable resources and rows and cols 1-5, loop our indexes to match
                 // http://stackoverflow.com/a/4412200/276183 for handling negative mod in java
@@ -153,26 +163,25 @@ public class DemoTileProvider extends GenericTileProvider {
 
                 Bitmap bmp = resCache.get(resName);
 
-                if(bmp == null){
+                if (bmp == null) {
 
-                    int resID = ctx.getResources().getIdentifier(resName,"drawable", ctx.getPackageName());
-
-                    bmp = BitmapFactory.decodeResource(ctx.getResources(),resID);
-
-                    resCache.put(resName,bmp);
+                    int resID = ctx.getResources().getIdentifier(resName, "drawable", ctx.getPackageName());
+                    bmp = BitmapFactory.decodeResource(ctx.getResources(), resID);
+                    resCache.put(resName, bmp);
 
                 }
 
 
                 t.setBmpData(bmp);
 
-                // put it in the cache for the UI thread to find via getTile()
+                // cache the tile so the next getTile() for this tile will offer something the view can render
                 tileCache.put(t.cacheKey, t);
 
+                // next time the provider polls hasFreshData(), it'll trigger a fresh set of getTiles()
                 hasFreshData.set(true);
             }
 
-            Log.e(Utils.LOG_TAG, " ####################### I finished normally!");
+            Log.d(Utils.LOG_TAG,"Queue processing finished normally");
         }
     }
 
@@ -181,14 +190,14 @@ public class DemoTileProvider extends GenericTileProvider {
     public void onSurfaceDestroyed() {
 
         // ensure we don't leave any hanging threads
-        if(executorService != null) {
+        if (executorService != null) {
             executorService.shutdownNow();
         }
 
     }
 
     @Override
-    public String getDebugSummary(){
+    public String getDebugSummary() {
 
         int cache = tileCache == null ? 0 : tileCache.size();
         return String.format(DEBUG_SUMMARY_FMT, cache);
