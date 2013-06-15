@@ -26,5 +26,5 @@
     <string name="button_about">\?</string>
 
     <string name="dialog_about_title">What\'s This?</string>
-    <string name="dialog_about_text">This app is demonstation of a simple tile provider using the TileBitmapView library. \n\nMore information at http://site.com/url/when/ready\n\nAuthor: Barry O\'Neill, who accepts no responsibility whatsoever. *kaboom*</string>
+    <string name="dialog_about_text">This app is demonstation of a simple tile provider using the TileBitmapView library, published at:\n\nhttps://github.com/barryoneill/TiledBitmapView\n\nAuthor: Barry O\'Neill, who accepts no responsibility whatsoever. *kaboom*</string>
 </resources>

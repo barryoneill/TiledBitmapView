@@ -17,7 +17,8 @@
 -->
 <!-- Version history (try to keep synced with versions of library):
            1 (1.0) - everything previous to the first github push
-           2 (1.2) - license applied, cleaned up and commented, first 'stable' version -->
+           2 (1.2) - license applied, cleaned up and commented, 'stable' version (pushed to market 14 Jun 2013)
+-->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="net.nologin.meep.tbv.demo"
           android:versionCode="2"
@@ -25,7 +26,8 @@
 
     <!-- support SDK 10 and upwards (2.3.3 Gingerbread) -->
     <uses-sdk  android:minSdkVersion="10" android:targetSdkVersion="17"/>
-    <application android:label="@string/app_name" android:allowBackup="true">
+    <application android:label="@string/app_name" android:allowBackup="true"
+            android:icon="@drawable/tbvdemo_launcher">
         <activity
                 android:name=".TBVDemoActivity"
                 android:label="@string/app_name">
