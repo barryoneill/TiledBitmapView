@@ -557,10 +557,12 @@ public class TiledBitmapView extends SurfaceView implements SurfaceHolder.Callba
             // -------------------  debug box at bottom right ------------------------
             if (debugEnabled) {
 
-                String fmt1 = "%dx%d, zf=%1.3f";
+                String fmt1 = "%dx%d, t=%dx%d zf=%1.3f";
                 String fmt2 = "x=%5d,y=%5d, cx=%4d,cy=%4d";
-                String msgResAndScale = String.format(fmt1, state.surfaceW, state.surfaceH, snapshot.zoomFactor);
-                String msgOffset = String.format(fmt2, snapshot.surfaceOffsetX, snapshot.surfaceOffsetY, snapshot.canvasOffsetX, snapshot.canvasOffsetY);
+                String msgResAndScale = String.format(fmt1, state.surfaceW, state.surfaceH,
+                        state.tileWidth, state.tileWidth, snapshot.zoomFactor);
+                String msgOffset = String.format(fmt2, snapshot.surfaceOffsetX, snapshot.surfaceOffsetY,
+                        snapshot.canvasOffsetX, snapshot.canvasOffsetY);
                 String msgVisibleIds = snapshot.visibleTileIdRange.toString();
                 String msgProvider = tileProvider == null ? "" : tileProvider.getDebugSummary();
                 String msgMemory = Utils.getMemDebugString();
