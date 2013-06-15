@@ -37,7 +37,7 @@ public enum GridAnchor {
      * @param tileWidth    The width of a tile in px
      * @return A {@link Pair} containing the (left,top) position as described.
      */
-    final Pair<Integer, Integer> getPosition(int surfaceWidth, int surfaceHeight, int tileWidth) {
+    public final Pair<Integer, Integer> getPosition(int surfaceWidth, int surfaceHeight, int tileWidth) {
 
         // default to 0,0 (covers left hand side and across top)
         int x = 0, y = 0;
