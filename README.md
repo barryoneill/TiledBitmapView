@@ -2,8 +2,7 @@
 
 ## What Is TiledBitmapView? ##
 This Android library provides a custom 
-[SurfaceView](http://developer.android.com/reference/android/view/SurfaceView.html)  
-called **TiledBitmapView** whose contents are loaded tilewise from a provider - similar to the way 
+[SurfaceView](http://developer.android.com/reference/android/view/SurfaceView.html) called **TiledBitmapView** whose contents are loaded tilewise from a provider - similar to the way 
 map applications such as Google Maps load their content dynamically as the user scrolls around 
 (although this library has absolutely nothing to do with mapping).  
 
