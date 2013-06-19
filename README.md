@@ -6,7 +6,7 @@ This Android library provides a custom
 map applications such as Google Maps load their content dynamically as the user scrolls around 
 (although this library has absolutely nothing to do with mapping).  
 
-It supports devices running Android **2.3.3** (*API Level: 10, GINGERBREAD_MR1*).
+It supports devices running Android **2.3.3** (API Level: 10, GINGERBREAD_MR1).
 
 The goal of this library is to be as lightweight and simple as possible, and has no dependencies of
 its own.  It's not particularly feature heavy, it simply supports a scrollable view with dynamic 
