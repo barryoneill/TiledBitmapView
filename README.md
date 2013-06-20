@@ -21,7 +21,7 @@ content.
 	source with 25 tiles making up a repeating larger image of an area of stones.  The screenshot 
 	below shows the demo with debug enabled, so you can see the tiles (click for bigger):
 
-	[![click for bigger](http://barryoneill.github.io/TiledBitmapView/ghpages_static/screenshots/demoprov_withdebug_400.png)](http://barryoneill.github.io/TiledBitmapView/ghpages_static/screenshots/demoprov_withdebug_1280.png)
+	[![click for bigger](http://barryoneill.github.io/TiledBitmapView/screenshots/demoprov_withdebug_400.png)](http://barryoneill.github.io/TiledBitmapView/screenshots/demoprov_withdebug_1280.png)
 	
 		
 - Wolfram CA ([Play Store](https://play.google.com/store/apps/details?id=net.nologin.meep.ca) 
@@ -32,7 +32,7 @@ content.
 	user scrolls down, more tiles with successive generations are generated on the fly and rendered.
 	The screenshot below also has debug enabled (click for bigger):
 
-	[![click for bigger](http://barryoneill.github.io/TiledBitmapView/ghpages_static/screenshots/wolframca_withdebug_400.png)](http://barryoneill.github.io/TiledBitmapView/ghpages_static/screenshots/wolframca_withdebug_1280.png)
+	[![click for bigger](http://barryoneill.github.io/TiledBitmapView/screenshots/wolframca_withdebug_400.png)](http://barryoneill.github.io/TiledBitmapView/screenshots/wolframca_withdebug_1280.png)
 
 ## Using TiledBitmapView ##
 
@@ -74,7 +74,7 @@ By default, the TiledBitmapView will produce dummy content until you're ready to
 own provider.  To check that the library is working, simply deploy your application to your 
 device/emulator and the view should render content similar to the following (click for bigger):   
 
-[![click for bigger](http://barryoneill.github.io/TiledBitmapView/ghpages_static/screenshots/genericprov_nodebug_400.png)](http://barryoneill.github.io/TiledBitmapView/ghpages_static/screenshots/genericprov_nodebug_1280.png)
+[![click for bigger](http://barryoneill.github.io/TiledBitmapView/screenshots/genericprov_nodebug_400.png)](http://barryoneill.github.io/TiledBitmapView/screenshots/genericprov_nodebug_1280.png)
 
 ## Providing your own tiles ##
 
@@ -86,7 +86,7 @@ tiles with that hideous yellow circle on a gray background, that you see above.
 
 Before writing your own implementation of this interface: 
 
-* Carefully read the [TileProvider JavaDoc](http://barryoneill.github.io/TiledBitmapView/ghpages_static/javadoc/index.html?net/nologin/meep/tbv/TileProvider.html) 
+* Carefully read the [TileProvider JavaDoc](http://barryoneill.github.io/TiledBitmapView/javadoc/index.html?net/nologin/meep/tbv/TileProvider.html) 
 	for information on the lifecycle of a provider and the role of each of the interface's methods.   
 * Look at the [source for the DemoTileProvider](https://github.com/barryoneill/TiledBitmapView/blob/master/demo/src/net/nologin/meep/tbv/demo/DemoTileProvider.java) 
 	to see an example of a provider that generates the desired tiles asynchronously, resulting
