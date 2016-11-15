@@ -38,7 +38,7 @@ content.
 
 ### Adding the library as a project dependency ###
 
-For [Android Studio](http://developer.android.com/sdk/installing/studio.html) 2.2, simply use Help, then type "import module", and use the wizzard.
+For [Android Studio](http://developer.android.com/sdk/installing/studio.html) 2.2, simply use Help, then type "import module", and use the wizard.
 
 For older versions of [Android Studio](http://developer.android.com/sdk/installing/studio.html) (which is based on 
 [Intellij IDEA](http://www.jetbrains.com/idea/)) this consists of the following steps (at the
